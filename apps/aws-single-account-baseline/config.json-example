@@ -1,0 +1,76 @@
+{
+  "roles": [
+    {
+      "name": "ACCOUNT_ADMIN_ROLE",
+      "policies": [
+        "ACCOUNT_ADMIN_POLICY",
+        "BASIC_ALL_USERS_POLICY"
+      ],
+      "permissionsBoundary": "REGION_RESTRICTION_BOUNDARY"
+    },
+    {
+      "name": "GLOBAL_DEVELOPER_ROLE",
+      "policies": [
+        "BASIC_ALL_USERS_POLICY",
+        {
+          "name": "GLOBAL_DEVELOPER_POLICY",
+          "allowedActions": [
+            "ec2:*",
+            "s3:*",
+            "lambda:*",
+            "logs:*",
+            "dynamodb:*"
+          ]
+        }
+      ],
+      "permissionsBoundary": "REGION_RESTRICTION_BOUNDARY"
+    },
+    {
+      "name": "FINANCE_ADMIN_ROLE",
+      "policies": [
+        "FINANCE_ADMIN_POLICY",
+        "BASIC_ALL_USERS_POLICY"
+      ],
+      "permissionsBoundary": "REGION_RESTRICTION_BOUNDARY"
+    }
+  ],
+  "groups": [
+    {
+      "name": "OWNERS",
+      "roles": [
+        "ACCOUNT_ADMIN_ROLE",
+        "GLOBAL_DEVELOPER_ROLE",
+        "FINANCE_ADMIN_ROLE"
+      ]
+    },
+    {
+      "name": "DEVELOPERS",
+      "roles": ["GLOBAL_DEVELOPER_ROLE"]
+    }
+  ],
+  "users": [
+    {
+      "name": "alice",
+      "create": true,
+      "groups": ["OWNERS"]
+    },
+    {
+      "name": "bob",
+      "create": true,
+      "groups": ["DEVELOPERS"]
+    }
+  ],
+  "allowedRegions": [
+    "us-east-1",
+    "eu-west-1"
+  ],
+  "budget": {
+    "limitAmount": "100",
+    "limitUnit": "USD",
+    "subscriberEmailAddresses": ["finance@example.com"]
+  },
+  "tags": {
+    "Environment": "dev",
+    "Owner": "platform-team"
+  }
+}

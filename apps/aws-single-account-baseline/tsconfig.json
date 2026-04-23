@@ -1,0 +1,9 @@
+{
+  "extends": "@cloud-baseline/typescript-config/base.json",
+  "compilerOptions": {
+    "outDir": "bin"
+  },
+  "include": [
+    "index.ts"
+  ]
+}

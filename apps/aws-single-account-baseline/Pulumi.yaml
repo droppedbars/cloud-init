@@ -1,0 +1,3 @@
+name: aws-single-account-baseline
+runtime: nodejs
+description: Single AWS account with basic security, governance, identity and budget guardrails.

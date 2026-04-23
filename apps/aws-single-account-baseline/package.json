@@ -1,0 +1,25 @@
+{
+  "name": "aws-single-account",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.ts\"",
+    "build": "tsc"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@pulumi/aws": "^7.26.0",
+    "@pulumi/pulumi": "^3.231.0"
+  },
+  "devDependencies": {
+    "@cloud-baseline/eslint-config": "*",
+    "@cloud-baseline/typescript-config": "*"
+  }
+}

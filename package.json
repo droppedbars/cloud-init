@@ -1,0 +1,20 @@
+{
+  "name": "cloud-init",
+  "version": "1.0.0",
+  "packageManager": "npm@10.8.2",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "lint": "turbo lint",
+    "lint:fix": "turbo lint:fix",
+    "format": "turbo format",
+    "build": "turbo build",
+    "preview": "turbo preview",
+    "deploy": "turbo deploy"
+  },
+  "devDependencies": {
+    "turbo": "^2.9.6"
+  }
+}
