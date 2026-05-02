@@ -2,7 +2,6 @@
   "roles": [
     {
       "name": "ACCOUNT_ADMIN_ROLE",
-      "allowAccessKeyManagement": true,
       "policies": [
         "ACCOUNT_ADMIN_POLICY",
         "BASIC_ALL_USERS_POLICY"
@@ -42,11 +41,13 @@
         "ACCOUNT_ADMIN_ROLE",
         "GLOBAL_DEVELOPER_ROLE",
         "FINANCE_ADMIN_ROLE"
-      ]
+      ],
+      "allowAccessKeyManagement": true
     },
     {
       "name": "DEVELOPERS",
-      "roles": ["GLOBAL_DEVELOPER_ROLE"]
+      "roles": ["GLOBAL_DEVELOPER_ROLE"],
+      "allowAccessKeyManagement": true
     }
   ],
   "users": [

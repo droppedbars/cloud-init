@@ -34,7 +34,7 @@ export function getSelfServiceMfaPolicyDocument() {
       {
         sid: 'AllowManageOwnVirtualMFADevice',
         actions: ['iam:CreateVirtualMFADevice', 'iam:DeleteVirtualMFADevice'],
-        resources: ['arn:aws:iam::*:mfa/${aws:username}'],
+        resources: ['arn:aws:iam::*:mfa/*'],
       },
       {
         sid: 'AllowManageOwnUserMFA',

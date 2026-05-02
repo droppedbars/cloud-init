@@ -10,13 +10,13 @@ export interface RoleConfig {
   name: string;
   policies: (string | PolicyConfig)[];
   permissionsBoundary?: string;
-  /** When true, attaches MANAGE_ACCESS_KEYS_POLICY granting iam:CreateAccessKey and iam:UpdateAccessKey. */
-  allowAccessKeyManagement?: boolean;
 }
 
 export interface GroupConfig {
   name: string;
   roles: string[];
+  /** When true, attaches MANAGE_ACCESS_KEYS_POLICY granting iam:CreateAccessKey and iam:UpdateAccessKey to the group. */
+  allowAccessKeyManagement?: boolean;
 }
 
 export interface UserConfig {

@@ -36,6 +36,25 @@ export function getRegionRestrictionBoundaryDocument(allowedRegions: string[]) {
           },
         ],
       },
+      {
+        sid: 'PreventBoundaryModification',
+        effect: 'Deny',
+        actions: [
+          'iam:DeleteRolePermissionsBoundary',
+          'iam:PutRolePermissionsBoundary',
+          'iam:DeleteUserPermissionsBoundary',
+          'iam:PutUserPermissionsBoundary',
+        ],
+        resources: ['*'],
+        conditions: [
+          {
+            test: 'StringEquals',
+            variable: 'iam:PermissionsBoundary',
+            // Note: In AWS partition, arn:aws:iam is correct. Account ID doesn't need to be strictly interpolated if we use `*` or a generic pattern, but for stricter control we would use the account ID. However, using `*` for the account id part of the ARN is also valid.
+            values: ['arn:aws:iam::*:policy/REGION_RESTRICTION_BOUNDARY'],
+          },
+        ],
+      },
     ],
   });
 }

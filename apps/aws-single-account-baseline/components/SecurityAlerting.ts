@@ -187,6 +187,16 @@ export class SecurityAlerting extends pulumi.ComponentResource {
                       StringEquals: { 's3:x-amz-acl': 'bucket-owner-full-control' },
                     },
                   },
+                  {
+                    Sid: 'DenyInsecureTransport',
+                    Effect: 'Deny',
+                    Principal: '*',
+                    Action: 's3:*',
+                    Resource: [`${bucketArn}`, `${bucketArn}/*`],
+                    Condition: {
+                      Bool: { 'aws:SecureTransport': 'false' },
+                    },
+                  },
                 ],
               }),
             ),
@@ -249,7 +259,7 @@ export class SecurityAlerting extends pulumi.ComponentResource {
           includeGlobalServiceEvents: true,
           isMultiRegionTrail: true,
           enableLogFileValidation: true,
-          eventSelectors: [{ readWriteType: 'WriteOnly', includeManagementEvents: true }],
+          eventSelectors: [{ readWriteType: 'All', includeManagementEvents: true }],
         },
         // Must wait for BOTH the bucket policy and the CWL role policy.
         // The role policy is an inline resource — referencing cwlRole.arn only ensures

@@ -71,12 +71,15 @@ for (const role of config.roles) {
       allPoliciesToCreate.add(polName);
     }
   }
-  // Opt-in access-key management: register shared policy for deduplication
-  if (role.allowAccessKeyManagement) {
-    allPoliciesToCreate.add('MANAGE_ACCESS_KEYS_POLICY');
-  }
   if (role.permissionsBoundary && !role.permissionsBoundary.startsWith('arn:aws:iam::')) {
     allBoundariesToCreate.add(role.permissionsBoundary);
+  }
+}
+
+for (const group of config.groups) {
+  // Opt-in access-key management: register shared policy for deduplication
+  if (group.allowAccessKeyManagement) {
+    allPoliciesToCreate.add('MANAGE_ACCESS_KEYS_POLICY');
   }
 }
 
@@ -183,11 +186,6 @@ for (const roleConfig of config.roles) {
     return customPolicyMap[roleSpecificKey] ?? customPolicyMap[p.name];
   });
 
-  // Append opt-in access-key management policy
-  if (roleConfig.allowAccessKeyManagement) {
-    policyArns.push(customPolicyMap['MANAGE_ACCESS_KEYS_POLICY']);
-  }
-
   const boundaryArn = roleConfig.permissionsBoundary
     ? roleConfig.permissionsBoundary.startsWith('arn:aws:iam::')
       ? roleConfig.permissionsBoundary
@@ -224,7 +222,12 @@ for (const groupConfig of config.groups) {
     {
       groupName: groupConfig.name,
       roles: requestedRoles,
-      sharedPolicyArns: [selfServiceMfaPolicy.arn],
+      sharedPolicyArns: [
+        selfServiceMfaPolicy.arn,
+        ...(groupConfig.allowAccessKeyManagement
+          ? [customPolicyMap['MANAGE_ACCESS_KEYS_POLICY']]
+          : []),
+      ],
     },
     { dependsOn: roleComponents },
   );

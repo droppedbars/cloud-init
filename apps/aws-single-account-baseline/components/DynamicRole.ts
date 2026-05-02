@@ -27,6 +27,13 @@ export class DynamicRole extends pulumi.ComponentResource {
               identifiers: [pulumi.interpolate`arn:aws:iam::${currentCaller.accountId}:root`],
             },
           ],
+          conditions: [
+            {
+              test: 'Bool',
+              variable: 'aws:MultiFactorAuthPresent',
+              values: ['true'],
+            },
+          ],
         },
       ],
     });
