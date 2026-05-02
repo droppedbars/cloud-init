@@ -2,6 +2,7 @@
   "roles": [
     {
       "name": "ACCOUNT_ADMIN_ROLE",
+      "allowAccessKeyManagement": true,
       "policies": [
         "ACCOUNT_ADMIN_POLICY",
         "BASIC_ALL_USERS_POLICY"
@@ -72,5 +73,10 @@
   "tags": {
     "Environment": "dev",
     "Owner": "platform-team"
+  },
+  "alerting": {
+    "notifyOnAccessKeyCreation": true,
+    "notifyOnConsoleLogin": true,
+    "subscriberEmailAddresses": ["security@example.com"]
   }
 }

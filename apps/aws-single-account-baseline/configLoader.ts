@@ -10,6 +10,8 @@ export interface RoleConfig {
   name: string;
   policies: (string | PolicyConfig)[];
   permissionsBoundary?: string;
+  /** When true, attaches MANAGE_ACCESS_KEYS_POLICY granting iam:CreateAccessKey and iam:UpdateAccessKey. */
+  allowAccessKeyManagement?: boolean;
 }
 
 export interface GroupConfig {
@@ -29,12 +31,22 @@ export interface BudgetConfig {
   subscriberEmailAddresses: string[];
 }
 
+export interface AlertingConfig {
+  /** Fire an alert when any IAM user creates an access key. */
+  notifyOnAccessKeyCreation: boolean;
+  /** Fire an alert when any user signs into the AWS Console. */
+  notifyOnConsoleLogin: boolean;
+  /** Email addresses that will receive the SNS notifications. */
+  subscriberEmailAddresses: string[];
+}
+
 export interface Config {
   roles: RoleConfig[];
   groups: GroupConfig[];
   users: UserConfig[];
   allowedRegions: string[];
   budget?: BudgetConfig;
+  alerting?: AlertingConfig;
   tags?: Record<string, string>;
 }
 
@@ -52,6 +64,7 @@ export function loadConfig(): Config {
     users: configData.users || [],
     allowedRegions: configData.allowedRegions || [],
     budget: configData.budget,
+    alerting: configData.alerting,
     tags: configData.tags || {},
   };
 }

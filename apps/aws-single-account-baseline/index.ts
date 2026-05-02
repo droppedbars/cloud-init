@@ -6,6 +6,7 @@ import { UserGroupMemberships } from './components/UserGroupMemberships';
 import { DynamicRole } from './components/DynamicRole';
 import { DynamicGroup } from './components/DynamicGroup';
 import { AccountBudget } from './components/AccountBudget';
+import { SecurityAlerting } from './components/SecurityAlerting';
 
 type GroupOutput = {
   groupName: pulumi.Output<string>;
@@ -27,6 +28,14 @@ const NON_TAGGABLE_TYPES = new Set([
   'aws:iam/groupPolicyAttachment:GroupPolicyAttachment',
   'aws:iam/userPolicyAttachment:UserPolicyAttachment',
   'aws:iam/accessKey:AccessKey',
+  'aws:iam/accountPasswordPolicy:AccountPasswordPolicy',
+  'aws:iam/rolePolicy:RolePolicy',
+  'aws:cloudwatch/eventTarget:EventTarget',
+  'aws:cloudwatch/logMetricFilter:LogMetricFilter',
+  'aws:sns/topicPolicy:TopicPolicy',
+  'aws:sns/topicSubscription:TopicSubscription',
+  'aws:s3/bucketPolicy:BucketPolicy',
+  'aws:s3/bucketPublicAccessBlock:BucketPublicAccessBlock',
 ]);
 
 pulumi.runtime.registerStackTransformation((args) => {
@@ -61,6 +70,10 @@ for (const role of config.roles) {
       // Plain string or object without args — shared, deduplicated
       allPoliciesToCreate.add(polName);
     }
+  }
+  // Opt-in access-key management: register shared policy for deduplication
+  if (role.allowAccessKeyManagement) {
+    allPoliciesToCreate.add('MANAGE_ACCESS_KEYS_POLICY');
   }
   if (role.permissionsBoundary && !role.permissionsBoundary.startsWith('arn:aws:iam::')) {
     allBoundariesToCreate.add(role.permissionsBoundary);
@@ -104,6 +117,15 @@ for (const pol of allPoliciesToCreate) {
   );
   customPolicyMap[pol] = customPolicy.arn;
 }
+
+// Create the self-service MFA policy — attached to every group so users can
+// bootstrap MFA from their direct session before assuming any role.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const selfServiceMfaModule = require('./policy/SELF_SERVICE_MFA_POLICY');
+const selfServiceMfaPolicy = new aws.iam.Policy('shared-policy-SELF_SERVICE_MFA_POLICY', {
+  name: 'SELF_SERVICE_MFA_POLICY',
+  policy: selfServiceMfaModule[Object.keys(selfServiceMfaModule)[0]]().json,
+});
 
 // Create shared boundary policies
 for (const pol of allBoundariesToCreate) {
@@ -161,6 +183,11 @@ for (const roleConfig of config.roles) {
     return customPolicyMap[roleSpecificKey] ?? customPolicyMap[p.name];
   });
 
+  // Append opt-in access-key management policy
+  if (roleConfig.allowAccessKeyManagement) {
+    policyArns.push(customPolicyMap['MANAGE_ACCESS_KEYS_POLICY']);
+  }
+
   const boundaryArn = roleConfig.permissionsBoundary
     ? roleConfig.permissionsBoundary.startsWith('arn:aws:iam::')
       ? roleConfig.permissionsBoundary
@@ -197,6 +224,7 @@ for (const groupConfig of config.groups) {
     {
       groupName: groupConfig.name,
       roles: requestedRoles,
+      sharedPolicyArns: [selfServiceMfaPolicy.arn],
     },
     { dependsOn: roleComponents },
   );
@@ -209,13 +237,29 @@ for (const groupConfig of config.groups) {
   };
 }
 
-// 3. Provision the baseline users
+// 3. Enforce a deterministic account password policy.
+//    Without this, AWS applies opaque defaults which can cause misleading
+//    "does not comply with password policy" errors on first-login resets.
+new aws.iam.AccountPasswordPolicy('account-password-policy', {
+  minimumPasswordLength: 12,
+  requireLowercaseCharacters: true,
+  requireUppercaseCharacters: true,
+  requireNumbers: true,
+  requireSymbols: true,
+  allowUsersToChangePassword: true,
+  // Disable forced rotation — MFA is the primary control here.
+  maxPasswordAge: 0,
+  passwordReusePrevention: 24,
+  hardExpiry: false,
+});
+
+// 4. Provision the baseline users
 const users = new BaselineUsers('baseline-users-component', {
   users: config.users,
   allowedRegions: config.allowedRegions,
 });
 
-// 4. Attach users to groups
+// 5. Attach users to groups
 // Wait for users and groups to be created first by defining a dependsOn relationship
 new UserGroupMemberships(
   'user-group-memberships',
@@ -228,7 +272,7 @@ new UserGroupMemberships(
 // Export outputs
 export const initialPasswords = users.initialPasswords;
 
-// 5. Provision Account Budget if configured
+// 6. Provision Account Budget if configured
 if (config.budget) {
   new AccountBudget('account-baseline-budget', {
     limitAmount: config.budget.limitAmount,
@@ -236,3 +280,12 @@ if (config.budget) {
     subscriberEmailAddresses: config.budget.subscriberEmailAddresses,
   });
 }
+
+// 7. Provision Security Alerting if configured
+export const securityAlertingTopicArn = config.alerting
+  ? new SecurityAlerting('security-alerting', {
+      notifyOnAccessKeyCreation: config.alerting.notifyOnAccessKeyCreation,
+      notifyOnConsoleLogin: config.alerting.notifyOnConsoleLogin,
+      subscriberEmailAddresses: config.alerting.subscriberEmailAddresses,
+    }).topicArn
+  : undefined;

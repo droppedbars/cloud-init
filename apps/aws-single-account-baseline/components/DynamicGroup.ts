@@ -5,6 +5,8 @@ import { getGroupAssumeRolePolicyDocument } from '../policy/GROUP_ASSUME_ROLE_PO
 export interface DynamicGroupArgs {
   groupName: string;
   roles: Record<string, pulumi.Output<string>>;
+  /** Policies attached to the group itself (available in every member's direct session). */
+  sharedPolicyArns?: pulumi.Input<string>[];
 }
 
 export class DynamicGroup extends pulumi.ComponentResource {
@@ -42,6 +44,16 @@ export class DynamicGroup extends pulumi.ComponentResource {
           group: group.name,
           policyArn: groupAssumeRolePolicy.arn,
         },
+        { parent: this },
+      );
+    });
+
+    // Attach shared baseline policies (e.g. self-service MFA) directly to the group
+    // so members have these permissions in their direct session before assuming a role.
+    (args.sharedPolicyArns ?? []).forEach((policyArn, i) => {
+      new aws.iam.GroupPolicyAttachment(
+        `${args.groupName}-shared-policy-${i}`,
+        { group: group.name, policyArn },
         { parent: this },
       );
     });
