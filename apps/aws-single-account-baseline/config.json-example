@@ -78,5 +78,6 @@
     "notifyOnAccessKeyCreation": true,
     "notifyOnConsoleLogin": true,
     "subscriberEmailAddresses": ["security@example.com"]
-  }
+  },
+  "preserveOnDestroy": false
 }

@@ -5,6 +5,11 @@ import { UserConfig } from '../configLoader';
 export interface BaselineUsersArgs {
   users: UserConfig[];
   allowedRegions: string[];
+  /**
+   * When true, sets protect:true on IAM user resources so they survive a
+   * pulumi destroy. Defaults to false.
+   */
+  preserveOnDestroy?: boolean;
 }
 
 export class BaselineUsers extends pulumi.ComponentResource {
@@ -12,6 +17,8 @@ export class BaselineUsers extends pulumi.ComponentResource {
 
   constructor(name: string, args: BaselineUsersArgs, opts?: pulumi.ComponentResourceOptions) {
     super('cloud-baseline:iam:BaselineUsers', name, args, opts);
+
+    const protect = args.preserveOnDestroy ?? false;
 
     for (const userConfig of args.users) {
       if (userConfig.create) {
@@ -21,7 +28,7 @@ export class BaselineUsers extends pulumi.ComponentResource {
             name: userConfig.name,
             forceDestroy: true,
           },
-          { parent: this },
+          { parent: this, protect },
         );
 
         const loginProfile = new aws.iam.UserLoginProfile(

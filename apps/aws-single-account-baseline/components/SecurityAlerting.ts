@@ -8,6 +8,11 @@ export interface SecurityAlertingArgs {
   notifyOnConsoleLogin: boolean;
   /** Email addresses that will receive SNS notifications. */
   subscriberEmailAddresses: string[];
+  /**
+   * When true, sets protect:true on durable resources (trail, S3 bucket, CWL log
+   * group, SNS topic) so they survive a pulumi destroy. Defaults to false.
+   */
+  preserveOnDestroy?: boolean;
 }
 
 export interface SecurityAlertingOutputs {
@@ -56,14 +61,18 @@ export class SecurityAlerting extends pulumi.ComponentResource {
       { parent: this },
     );
 
+    const protect = args.preserveOnDestroy ?? false;
     const regionalOpts: pulumi.CustomResourceOptions = { parent: this, provider: usEast1Provider };
+    // durableOpts applies protect to resources that hold audit history or send alerts.
+    const durableOpts: pulumi.CustomResourceOptions = { ...regionalOpts, protect };
+    const durableDefaultOpts: pulumi.CustomResourceOptions = { ...defaultOpts, protect };
     const identity = aws.getCallerIdentityOutput({}, { provider: usEast1Provider });
 
     // ── SNS Topic ─────────────────────────────────────────────────────────────
     const topic = new aws.sns.Topic(
       `${name}-topic`,
       { displayName: 'AWS Security Alerts' },
-      regionalOpts,
+      durableOpts,
     );
 
     args.subscriberEmailAddresses.forEach((email, i) => {
@@ -131,7 +140,7 @@ export class SecurityAlerting extends pulumi.ComponentResource {
       const trailBucket = new aws.s3.Bucket(
         `${name}-trail-bucket`,
         { forceDestroy: true },
-        defaultOpts,
+        durableDefaultOpts,
       );
 
       const bucketPab = new aws.s3.BucketPublicAccessBlock(
@@ -189,7 +198,7 @@ export class SecurityAlerting extends pulumi.ComponentResource {
       const logGroup = new aws.cloudwatch.LogGroup(
         `${name}-trail-logs`,
         { retentionInDays: 90 },
-        regionalOpts,
+        durableOpts,
       );
 
       // IAM role that allows CloudTrail to write log events to this log group.
@@ -245,7 +254,7 @@ export class SecurityAlerting extends pulumi.ComponentResource {
         // Must wait for BOTH the bucket policy and the CWL role policy.
         // The role policy is an inline resource — referencing cwlRole.arn only ensures
         // the role itself exists, not that its permissions have been attached.
-        { ...regionalOpts, dependsOn: [bucketPolicy, cwlRolePolicy] },
+        { ...durableOpts, dependsOn: [bucketPolicy, cwlRolePolicy] },
       );
 
       new aws.cloudwatch.LogMetricFilter(

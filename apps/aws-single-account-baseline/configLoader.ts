@@ -48,6 +48,12 @@ export interface Config {
   budget?: BudgetConfig;
   alerting?: AlertingConfig;
   tags?: Record<string, string>;
+  /**
+   * When true, sets protect:true on durable resources (CloudTrail, S3 audit log bucket,
+   * CloudWatch log group, SNS topic, and IAM users) so they survive a pulumi destroy.
+   * Defaults to false — destruction is permitted by default.
+   */
+  preserveOnDestroy?: boolean;
 }
 
 export function loadConfig(): Config {
@@ -66,5 +72,6 @@ export function loadConfig(): Config {
     budget: configData.budget,
     alerting: configData.alerting,
     tags: configData.tags || {},
+    preserveOnDestroy: configData.preserveOnDestroy ?? false,
   };
 }

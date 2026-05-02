@@ -257,6 +257,7 @@ new aws.iam.AccountPasswordPolicy('account-password-policy', {
 const users = new BaselineUsers('baseline-users-component', {
   users: config.users,
   allowedRegions: config.allowedRegions,
+  preserveOnDestroy: config.preserveOnDestroy,
 });
 
 // 5. Attach users to groups
@@ -287,5 +288,6 @@ export const securityAlertingTopicArn = config.alerting
       notifyOnAccessKeyCreation: config.alerting.notifyOnAccessKeyCreation,
       notifyOnConsoleLogin: config.alerting.notifyOnConsoleLogin,
       subscriberEmailAddresses: config.alerting.subscriberEmailAddresses,
+      preserveOnDestroy: config.preserveOnDestroy,
     }).topicArn
   : undefined;
