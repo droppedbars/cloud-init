@@ -69,6 +69,14 @@ To view the temporary passwords after deploying, run:
 pulumi stack output initialPasswords --show-secrets
 ```
 
+### ⚠️ Important: MFA Setup & Role Switching
+
+All generated roles enforce a strict **MFA requirement** in their trust policies (`"aws:MultiFactorAuthPresent": "true"`). 
+
+When a user logs in for the first time using only their password, they must navigate to "Security Credentials" to set up their Virtual MFA device. However, **their current console session remains authenticated by password only**. 
+
+If the user attempts to switch roles immediately after configuring MFA, AWS STS will reject the request (often masking it with an opaque `"Invalid information in one or more fields"` error in the console). **Users must explicitly Sign Out and Sign Back In using their newly configured MFA code** before they can successfully switch roles.
+
 ## Stack Management & Naming Collisions
 
 **WARNING:** Because this project serves as a foundational baseline for a _single AWS account_, all generated IAM Roles, Groups, and Policies (such as `ACCOUNT_ADMIN_ROLE`) use **explicit, hardcoded physical names** without stack-specific suffixes.
