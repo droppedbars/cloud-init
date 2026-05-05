@@ -10,6 +10,8 @@ This Pulumi project sets up a baseline environment for a single AWS subscription
 
 You can automatically provision IAM users, or attach existing users, to any dynamically assigned group (e.g. `ACCOUNT_ADMIN`) by defining them in the `config.json` file. You can also restrict all created users to specific AWS regions by providing an `allowedRegions` array.
 
+By default, the application looks for a `config.json` file in the root of the project. You can override this behavior and point to a custom configuration file by setting the `BASELINE_CONFIG_PATH` environment variable (e.g., `BASELINE_CONFIG_PATH=./custom-config.json pulumi up`).
+
 **`config.json` Example:**
 
 ```json
@@ -83,4 +85,16 @@ If the user attempts to switch roles immediately after configuring MFA, AWS STS 
 
 If you attempt to run this script using a different Pulumi stack (e.g., deploying the `prod` stack after already deploying the `dev` stack) within the exact same AWS account, Pulumi will fail with an `EntityAlreadyExists` error. The AWS account can only house one instance of these explicitly named baseline resources.
 
-_Note: Per our architectural rules, the IAM policy definitions explicitly declare specific actions instead of using wildcards (`_`) to adhere to the Principle of Least Privilege.\*
+_Note: Per our architectural rules, the IAM policy definitions explicitly declare specific actions instead of using wildcards (`*`) to adhere to the Principle of Least Privilege._
+
+## Testing
+
+An interactive End-to-End (E2E) testing script is included to quickly validate the infrastructure rules without impacting your real `config.json`.
+
+To run the automated test suite, ensure you have active AWS root/admin credentials in your terminal and run:
+
+```bash
+npm run test:e2e
+```
+
+This script will dynamically provision a throwaway Pulumi stack (`e2e-test`), pause to let you manually verify the MFA constraints as an actual user in the console, automatically spin up and terminate an EC2 instance to test the Budget Kill Switch, and cleanly destroy the entire stack when finished. See `TESTING.md` for more details on what is verified.

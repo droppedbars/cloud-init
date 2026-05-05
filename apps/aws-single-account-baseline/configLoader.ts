@@ -29,6 +29,10 @@ export interface BudgetConfig {
   limitAmount: string;
   limitUnit: string;
   subscriberEmailAddresses: string[];
+  killSwitch?: {
+    thresholdAmount: string;
+    subscriberEmailAddresses: string[];
+  };
 }
 
 export interface AlertingConfig {
@@ -57,7 +61,9 @@ export interface Config {
 }
 
 export function loadConfig(): Config {
-  const configPath = path.join(__dirname, 'config.json');
+  const configPath = process.env.BASELINE_CONFIG_PATH
+    ? path.resolve(process.cwd(), process.env.BASELINE_CONFIG_PATH)
+    : path.join(__dirname, 'config.json');
 
   if (!fs.existsSync(configPath)) {
     throw new Error(`Config file not found at ${configPath}`);

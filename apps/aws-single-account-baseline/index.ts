@@ -36,6 +36,7 @@ const NON_TAGGABLE_TYPES = new Set([
   'aws:sns/topicSubscription:TopicSubscription',
   'aws:s3/bucketPolicy:BucketPolicy',
   'aws:s3/bucketPublicAccessBlock:BucketPublicAccessBlock',
+  'aws:lambda/permission:Permission',
 ]);
 
 pulumi.runtime.registerStackTransformation((args) => {
@@ -282,6 +283,8 @@ if (config.budget) {
     limitAmount: config.budget.limitAmount,
     limitUnit: config.budget.limitUnit,
     subscriberEmailAddresses: config.budget.subscriberEmailAddresses,
+    allowedRegions: config.allowedRegions,
+    killSwitch: config.budget.killSwitch,
   });
 }
 

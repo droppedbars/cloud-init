@@ -69,7 +69,11 @@
   "budget": {
     "limitAmount": "100",
     "limitUnit": "USD",
-    "subscriberEmailAddresses": ["finance@example.com"]
+    "subscriberEmailAddresses": ["finance@example.com"],
+    "killSwitch": {
+      "thresholdAmount": "150",
+      "subscriberEmailAddresses": ["ops@example.com"]
+    }
   },
   "tags": {
     "Environment": "dev",
