@@ -108,18 +108,27 @@ const generateAliases = (resourceName: string): pulumi.Alias[] => {
 
 // Create shared (deduplicated) policies
 for (const pol of allPoliciesToCreate) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const policyModule = require(`./policy/${pol}`);
-  const exportKeys = Object.keys(policyModule);
-  const getPolicyDoc = policyModule[exportKeys[0]];
-  const policyDoc = getPolicyDoc();
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const policyModule = require(`./policy/${pol}`);
+    const exportKeys = Object.keys(policyModule);
+    const getPolicyDoc = policyModule[exportKeys[0]];
+    const policyDoc = getPolicyDoc();
 
-  const customPolicy = new aws.iam.Policy(
-    `shared-policy-${pol}`,
-    { name: pol, policy: policyDoc.json },
-    { aliases: generateAliases(pol) },
-  );
-  customPolicyMap[pol] = customPolicy.arn;
+    const customPolicy = new aws.iam.Policy(
+      `shared-policy-${pol}`,
+      { name: pol, policy: policyDoc.json },
+      { aliases: generateAliases(pol) },
+    );
+    customPolicyMap[pol] = customPolicy.arn;
+  } catch (error: any) {
+    if (error.code === 'MODULE_NOT_FOUND') {
+      // If no local file exists, assume it's an AWS managed policy shorthand
+      customPolicyMap[pol] = pulumi.output(`arn:aws:iam::aws:policy/${pol}`);
+    } else {
+      throw error;
+    }
+  }
 }
 
 // Create the self-service MFA policy — attached to every group so users can
@@ -133,18 +142,27 @@ const selfServiceMfaPolicy = new aws.iam.Policy('shared-policy-SELF_SERVICE_MFA_
 
 // Create shared boundary policies
 for (const pol of allBoundariesToCreate) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const policyModule = require(`./policy/${pol}`);
-  const exportKeys = Object.keys(policyModule);
-  const getPolicyDoc = policyModule[exportKeys[0]];
-  const policyDoc = getPolicyDoc(config.allowedRegions);
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const policyModule = require(`./policy/${pol}`);
+    const exportKeys = Object.keys(policyModule);
+    const getPolicyDoc = policyModule[exportKeys[0]];
+    const policyDoc = getPolicyDoc(config.allowedRegions);
 
-  const customBoundary = new aws.iam.Policy(
-    `shared-boundary-${pol}`,
-    { name: pol, policy: policyDoc.json },
-    { aliases: generateAliases(pol) },
-  );
-  customPolicyMap[pol] = customBoundary.arn;
+    const customBoundary = new aws.iam.Policy(
+      `shared-boundary-${pol}`,
+      { name: pol, policy: policyDoc.json },
+      { aliases: generateAliases(pol) },
+    );
+    customPolicyMap[pol] = customBoundary.arn;
+  } catch (error: any) {
+    if (error.code === 'MODULE_NOT_FOUND') {
+      // If no local file exists, assume it's an AWS managed policy shorthand
+      customPolicyMap[pol] = pulumi.output(`arn:aws:iam::aws:policy/${pol}`);
+    } else {
+      throw error;
+    }
+  }
 }
 
 // Create role-specific parameterized policies (e.g. GLOBAL_DEVELOPER_POLICY with allowedActions)
