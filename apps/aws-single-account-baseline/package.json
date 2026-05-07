@@ -8,7 +8,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.ts\"",
-    "build": "tsc"
+    "build": "tsc",
+    "test:e2e": "ts-node --transpileOnly scripts/e2e.ts"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +21,8 @@
   },
   "devDependencies": {
     "@cloud-baseline/eslint-config": "*",
-    "@cloud-baseline/typescript-config": "*"
+    "@cloud-baseline/typescript-config": "*",
+    "@types/node": "^25.6.0",
+    "ts-node": "^10.9.2"
   }
 }

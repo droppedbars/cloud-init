@@ -19,6 +19,10 @@ const DEFAULT_DEVELOPER_ACTIONS: string[] = [
   'dynamodb:DescribeTable',
   'dynamodb:Query',
   'dynamodb:Scan',
+  'health:DescribeEvents',
+  'health:DescribeEventDetails',
+  'health:DescribeAffectedEntities',
+  'health:DescribeEventTypes',
 ];
 
 export function getGlobalDeveloperPolicyDocument(actions?: string[]) {
