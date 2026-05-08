@@ -28,7 +28,7 @@ export function getRegionRestrictionBoundaryDocument(allowedRegions: string[]) {
           'artifact:*',
           'health:*',
           'cloudwatch:*',
-          'freetier:GetFreeTierUsage'
+          'freetier:GetFreeTierUsage',
         ],
         resources: ['*'],
         conditions: [
