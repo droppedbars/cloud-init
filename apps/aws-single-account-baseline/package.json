@@ -1,5 +1,5 @@
 {
-  "name": "aws-single-account",
+  "name": "aws-single-account-baseline",
   "version": "1.0.0",
   "description": "",
   "main": "index.ts",
@@ -8,20 +8,21 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.ts\"",
+    "type-check": "tsc --noEmit",
     "build": "tsc",
     "test:e2e": "ts-node --transpileOnly scripts/e2e.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "@pulumi/aws": "^7.26.0",
     "@pulumi/pulumi": "^3.231.0"
   },
   "devDependencies": {
-    "@cloud-baseline/eslint-config": "*",
-    "@cloud-baseline/typescript-config": "*",
+    "@cloud-init/eslint-config": "*",
+    "@cloud-init/typescript-config": "*",
     "@types/node": "^25.6.0",
     "ts-node": "^10.9.2"
   }

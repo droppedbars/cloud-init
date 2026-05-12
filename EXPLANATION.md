@@ -23,14 +23,14 @@ The repository is divided into two primary directories:
 
 To ensure consistent code quality and formatting without duplicating configuration files across every project, we use **Internal Packages**:
 
-- **@cloud-baseline/eslint-config**: Located in `packages/eslint-config`, this package houses the base ESLint, TypeScript parser plugins, and Prettier configurations.
-- **@cloud-baseline/typescript-config**: Located in `packages/typescript-config`, this package provides a base `tsconfig.json` defining strict compiler options.
+- **@cloud-init/eslint-config**: Located in `packages/eslint-config`, this package houses the base ESLint, TypeScript parser plugins, and Prettier configurations.
+- **@cloud-init/typescript-config**: Located in `packages/typescript-config`, this package provides a base `tsconfig.json` defining strict compiler options.
 
 **How it works**:
-The `eslint-config` package exports the central ruleset. An app like `aws-single-account` simply adds `"@cloud-baseline/eslint-config": "*"` to its local `package.json` `devDependencies` and extends it in its own local `eslint.config.js` file:
+The `eslint-config` package exports the central ruleset. An app like `aws-single-account` simply adds `"@cloud-init/eslint-config": "*"` to its local `package.json` `devDependencies` and extends it in its own local `eslint.config.js` file:
 
 ```javascript
-const baseConfig = require('@cloud-baseline/eslint-config');
+const baseConfig = require('@cloud-init/eslint-config');
 module.exports = [...baseConfig];
 ```
 

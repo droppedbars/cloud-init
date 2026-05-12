@@ -20,7 +20,7 @@ export class DynamicRole extends pulumi.ComponentResource {
   public readonly roleArn: pulumi.Output<string>;
 
   constructor(name: string, args: DynamicRoleArgs, opts?: pulumi.ComponentResourceOptions) {
-    super(`cloud-baseline:iam:DynamicRole:${args.roleName}`, name, args, opts);
+    super(`cloud-init:iam:DynamicRole:${args.roleName}`, name, args, opts);
 
     const currentCaller = aws.getCallerIdentityOutput({});
 
@@ -49,8 +49,8 @@ export class DynamicRole extends pulumi.ComponentResource {
               customerManagedPolicyReference: args.permissionsBoundaryRef.isManaged
                 ? undefined
                 : {
-                    name: args.permissionsBoundaryRef.name,
-                  },
+                  name: args.permissionsBoundaryRef.name,
+                },
               managedPolicyArn: args.permissionsBoundaryRef.isManaged
                 ? args.permissionsBoundaryRef.arn
                 : undefined,

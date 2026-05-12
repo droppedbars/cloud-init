@@ -1,6 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 import * as aws from '@pulumi/aws';
-import { getGroupAssumeRolePolicyDocument } from '../policy/GROUP_ASSUME_ROLE_POLICY';
+import getGroupAssumeRolePolicyDocument from '../policy/GROUP_ASSUME_ROLE_POLICY';
 
 export interface DynamicGroupArgs {
   groupName: string;
@@ -18,7 +18,7 @@ export class DynamicGroup extends pulumi.ComponentResource {
   public readonly groupId: pulumi.Output<string>;
 
   constructor(name: string, args: DynamicGroupArgs, opts?: pulumi.ComponentResourceOptions) {
-    super(`cloud-baseline:iam:DynamicGroup:${args.groupName}`, name, args, opts);
+    super(`cloud-init:iam:DynamicGroup:${args.groupName}`, name, args, opts);
 
     if (args.identityStrategy === 'IdentityCenter') {
       if (!args.identityStoreId || !args.ssoInstanceArn)

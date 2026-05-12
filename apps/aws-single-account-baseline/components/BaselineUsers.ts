@@ -19,7 +19,7 @@ export class BaselineUsers extends pulumi.ComponentResource {
   public readonly userIds: Record<string, pulumi.Output<string>> = {};
 
   constructor(name: string, args: BaselineUsersArgs, opts?: pulumi.ComponentResourceOptions) {
-    super('cloud-baseline:iam:BaselineUsers', name, args, opts);
+    super('cloud-init:iam:BaselineUsers', name, args, opts);
 
     const protect = args.preserveOnDestroy ?? false;
 

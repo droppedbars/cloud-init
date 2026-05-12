@@ -16,7 +16,7 @@ export class UserGroupMemberships extends pulumi.ComponentResource {
     args: UserGroupMembershipsArgs,
     opts?: pulumi.ComponentResourceOptions,
   ) {
-    super('cloud-baseline:iam:UserGroupMemberships', name, args, opts);
+    super('cloud-init:iam:UserGroupMemberships', name, args, opts);
 
     for (const userConfig of args.users) {
       if (userConfig.groups && userConfig.groups.length > 0) {

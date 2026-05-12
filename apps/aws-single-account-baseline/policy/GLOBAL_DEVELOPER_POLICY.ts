@@ -25,7 +25,7 @@ const DEFAULT_DEVELOPER_ACTIONS: string[] = [
   'health:DescribeEventTypes',
 ];
 
-export function getGlobalDeveloperPolicyDocument(actions?: string[]) {
+export default function getGlobalDeveloperPolicyDocument(actions?: string[]) {
   const resolvedActions = actions && actions.length > 0 ? actions : DEFAULT_DEVELOPER_ACTIONS;
 
   return aws.iam.getPolicyDocumentOutput({

@@ -13,7 +13,7 @@ import * as aws from '@pulumi/aws';
  * on roles (via BASIC_ALL_USERS_POLICY) and governs what a user can do once
  * they have assumed a role. Here we only need to allow the bootstrap actions.
  */
-export function getSelfServiceMfaPolicyDocument() {
+export default function getSelfServiceMfaPolicyDocument() {
   return aws.iam.getPolicyDocumentOutput({
     statements: [
       {

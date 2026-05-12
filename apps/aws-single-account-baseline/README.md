@@ -4,7 +4,7 @@ This Pulumi project sets up a baseline environment for a single AWS subscription
 
 ## Prerequisites & Security
 
-**IMPORTANT:** Before applying this baseline, you must manually log into the AWS Management Console as the **Root User** and configure a Multi-Factor Authentication (MFA) device. AWS strictly prohibits the programmatic management of root account credentials or MFA devices via Infrastructure as Code. While this baseline successfully enforces MFA for all generated IAM users, the root account itself must be secured by hand.
+**IMPORTANT:** Before applying this baseline, you must manually log into the AWS Management Console as the **Root User** and configure a Multi-Factor Authentication (MFA) device. AWS strictly prohibits the programmatic management of root account credentials or MFA devices via Infrastructure as Code. 
 
 ## Configuration
 
@@ -72,7 +72,7 @@ If `budget` is provided, Pulumi automatically provisions an overarching AWS Cost
 
 ## Accessing User Credentials
 
-*(Note: The following applies only when using `"identityStrategy": "Traditional"`. If you are using Identity Center, users will receive an email from AWS to set up their credentials and login via the AWS Access Portal URL.)*
+*(Note: The following applies only when using `"identityStrategy": "Traditional"`. If you are using Identity Center, users will receive an email from AWS to set up their credentials and login via the AWS Access Portal URL or may need to initiate a password reset.)*
 
 Upon successful deployment, each user is granted an AWS Management Console login profile with a temporary, auto-generated password (and a forced password reset on first login). Because these passwords are treated as secrets, Pulumi encrypts them in the state file.
 
