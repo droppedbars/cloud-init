@@ -15,7 +15,7 @@ export interface AccountBudgetArgs {
 
 export class AccountBudget extends pulumi.ComponentResource {
   constructor(name: string, args: AccountBudgetArgs, opts?: pulumi.ComponentResourceOptions) {
-    super('cloud-baseline:billing:AccountBudget', name, args, opts);
+    super('cloud-init:billing:AccountBudget', name, args, opts);
 
     const notifications: aws.types.input.budgets.BudgetNotification[] = [
       {

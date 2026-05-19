@@ -1,6 +1,6 @@
 import * as aws from '@pulumi/aws';
 
-export function getFinanceAdminPolicyDocument() {
+export default function getFinanceAdminPolicyDocument() {
   return aws.iam.getPolicyDocumentOutput({
     statements: [
       {

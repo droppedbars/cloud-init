@@ -1,6 +1,6 @@
 import * as aws from '@pulumi/aws';
 
-export function getRegionRestrictionBoundaryDocument(allowedRegions: string[]) {
+export default function getRegionRestrictionBoundaryDocument(allowedRegions: string[]) {
   // Note: Due to the nature of a Permissions Boundary, we must use an Allow *
   // statement, as a boundary strictly intersects with identity policies.
   // If we do not allow *, the boundary will implicitly deny everything.
@@ -28,7 +28,7 @@ export function getRegionRestrictionBoundaryDocument(allowedRegions: string[]) {
           'artifact:*',
           'health:*',
           'cloudwatch:*',
-          'freetier:GetFreeTierUsage'
+          'freetier:GetFreeTierUsage',
         ],
         resources: ['*'],
         conditions: [

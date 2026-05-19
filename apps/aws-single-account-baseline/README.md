@@ -4,7 +4,7 @@ This Pulumi project sets up a baseline environment for a single AWS subscription
 
 ## Prerequisites & Security
 
-**IMPORTANT:** Before applying this baseline, you must manually log into the AWS Management Console as the **Root User** and configure a Multi-Factor Authentication (MFA) device. AWS strictly prohibits the programmatic management of root account credentials or MFA devices via Infrastructure as Code. While this baseline successfully enforces MFA for all generated IAM users, the root account itself must be secured by hand.
+**IMPORTANT:** Before applying this baseline, you must manually log into the AWS Management Console as the **Root User** and configure a Multi-Factor Authentication (MFA) device. AWS strictly prohibits the programmatic management of root account credentials or MFA devices via Infrastructure as Code. 
 
 ## Configuration
 
@@ -12,10 +12,18 @@ You can automatically provision IAM users, or attach existing users, to any dyna
 
 By default, the application looks for a `config.json` file in the root of the project. You can override this behavior and point to a custom configuration file by setting the `BASELINE_CONFIG_PATH` environment variable (e.g., `BASELINE_CONFIG_PATH=./custom-config.json pulumi up`).
 
+### Identity Strategy (IAM vs. Identity Center)
+
+You can choose whether to use standard IAM Resources or **AWS IAM Identity Center** (formerly AWS SSO). 
+
+> [!IMPORTANT]
+> To use IAM Identity Center, you **must** manually enable it in your AWS Management Console first. AWS does not permit provisioning the core Identity Center Instance programmatically via standard Pulumi/Terraform APIs. Once enabled manually, you can set `"identityStrategy": "IdentityCenter"` in your config, and Pulumi will automatically map your configured users, groups, and roles to Identity Store Users, Groups, and Permission Sets. If you do not provide this setting, it defaults to `"Traditional"` (standard IAM).
+
 **`config.json` Example:**
 
 ```json
 {
+  "identityStrategy": "IdentityCenter",
   "roles": [
     {
       "name": "ACCOUNT_ADMIN_ROLE",
@@ -31,6 +39,7 @@ By default, the application looks for a `config.json` file in the root of the pr
   "users": [
     {
       "name": "alice",
+      "email": "alice@example.com",
       "create": true,
       "groups": ["ACCOUNT_ADMIN"]
     },
@@ -62,6 +71,8 @@ If `allowedRegions` is provided, a Permissions Boundary (`REGION_RESTRICTION_BOU
 If `budget` is provided, Pulumi automatically provisions an overarching AWS Cost Budget for the account, setting up notifications to the configured email addresses at both 80% (actual) and 100% (forecasted) thresholds.
 
 ## Accessing User Credentials
+
+*(Note: The following applies only when using `"identityStrategy": "Traditional"`. If you are using Identity Center, users will receive an email from AWS to set up their credentials and login via the AWS Access Portal URL or may need to initiate a password reset.)*
 
 Upon successful deployment, each user is granted an AWS Management Console login profile with a temporary, auto-generated password (and a forced password reset on first login). Because these passwords are treated as secrets, Pulumi encrypts them in the state file.
 

@@ -1,4 +1,4 @@
-# cloud-baseline
+# cloud-init
 
 ## 📝 License
 
@@ -36,8 +36,8 @@ If you find a security issue, please report it by emailing [EMAIL_ADDRESS].
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/your-org/cloud-baseline.git
-cd cloud-baseline
+git clone https://github.com/your-org/cloud-init.git
+cd cloud-init
 ```
 
 2. Install dependencies:

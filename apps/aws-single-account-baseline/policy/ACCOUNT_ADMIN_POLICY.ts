@@ -1,6 +1,6 @@
 import * as aws from '@pulumi/aws';
 
-export function getAccountAdminPolicyDocument() {
+export default function getAccountAdminPolicyDocument() {
   return aws.iam.getPolicyDocumentOutput({
     statements: [
       {

@@ -7,7 +7,7 @@ import * as aws from '@pulumi/aws';
  * Attach this policy to a group only when programmatic credential management is
  * explicitly required.
  */
-export function getManageAccessKeysPolicyDocument() {
+export default function getManageAccessKeysPolicyDocument() {
   return aws.iam.getPolicyDocumentOutput({
     statements: [
       {

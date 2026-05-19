@@ -53,6 +53,7 @@
   "users": [
     {
       "name": "alice",
+      "email": "alice@example.com",
       "create": true,
       "groups": ["OWNERS"]
     },

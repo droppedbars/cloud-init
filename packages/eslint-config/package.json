@@ -1,5 +1,5 @@
 {
-  "name": "@cloud-baseline/eslint-config",
+  "name": "@cloud-init/eslint-config",
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {

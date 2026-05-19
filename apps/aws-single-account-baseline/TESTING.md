@@ -91,7 +91,7 @@ The Kill Switch responds to AWS Budgets by executing a Lambda function that stop
 3. Use the AWS CLI to manually publish a message to that SNS Topic, simulating an AWS Budget trigger:
    ```bash
    aws sns publish \
-     --topic-arn "arn:aws:sns:REGION:ACCOUNT_ID:account-baseline-budget-kill-switch-topic" \
+     --topic-arn "arn:aws:sns:REGION:ACCOUNT_ID:account-init-budget-kill-switch-topic" \
      --message "Test Kill Switch Simulation"
    ```
 4. **Expected Result:** 

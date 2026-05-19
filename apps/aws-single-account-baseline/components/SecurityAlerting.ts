@@ -47,7 +47,7 @@ export class SecurityAlerting extends pulumi.ComponentResource {
   public readonly topicArn: pulumi.Output<string>;
 
   constructor(name: string, args: SecurityAlertingArgs, opts?: pulumi.ComponentResourceOptions) {
-    super('cloud-baseline:security:SecurityAlerting', name, {}, opts);
+    super('cloud-init:security:SecurityAlerting', name, {}, opts);
 
     // S3 log storage uses the stack's default region (e.g. ca-west-1) for data residency.
     // All other alerting resources (CloudTrail, CWL, Alarm, SNS) use us-east-1 so that IAM

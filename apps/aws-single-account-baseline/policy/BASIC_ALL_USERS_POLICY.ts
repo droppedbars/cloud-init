@@ -1,6 +1,6 @@
 import * as aws from '@pulumi/aws';
 
-export function getBasicAllUsersPolicyDocument() {
+export default function getBasicAllUsersPolicyDocument() {
   return aws.iam.getPolicyDocumentOutput({
     statements: [
       {

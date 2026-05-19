@@ -9,12 +9,14 @@ This project provisions a foundational AWS baseline. Instead of writing Pulumi c
 
 The orchestration happens inside `index.ts`, which follows a specific sequence:
 
-1. **Ingest Config**: `configLoader.ts` reads `config.json`, acting as the single source of truth for the entire deployment.
+1. **Ingest Config**: `configLoader.ts` reads `config.json`, acting as the single source of truth for the entire deployment. This includes determining the `identityStrategy` (Traditional IAM vs. IAM Identity Center).
 2. **Policy Deduplication**: Iterates through the config to determine which IAM policies are needed. It generates shared policies (like MFA enforcement) centrally so they are only created once in AWS.
-3. **Role Creation**: Generates IAM Roles (`DynamicRole.ts`) and attaches the requested policies and permission boundaries to them.
-4. **Group Mapping**: Generates IAM Groups (`DynamicGroup.ts`). It automatically creates and attaches an `sts:AssumeRole` policy to the group, granting group members permission to assume the specific Roles defined in the config.
-5. **User Provisioning**: Creates IAM users (`BaselineUsers.ts`), generates temporary passwords (encrypted in Pulumi state), forces a password reset on first login, and attaches the users to their respective Groups.
-6. **Guardrails & Security**: Provisions ancillary components like Cost Budgets and a multi-region CloudTrail alerting pipeline (`SecurityAlerting.ts`) for events like Access Key creation.
+3. **Role Creation**: Generates IAM Roles or SSO Permission Sets (`DynamicRole.ts`) and attaches the requested policies and permission boundaries to them.
+4. **Group Provisioning**: Generates IAM Groups or Identity Store Groups (`DynamicGroup.ts`). For Traditional IAM, it automatically creates and attaches an `sts:AssumeRole` policy granting group members permission to assume the specific Roles defined in the config. For Identity Center, it maps the groups to their respective Permission Sets using Account Assignments.
+5. **Password Policy**: Enforces a deterministic account password policy to ensure first-login resets function smoothly (Traditional IAM only).
+6. **User Provisioning**: Creates IAM Users or Identity Store Users (`BaselineUsers.ts`). For Traditional IAM, it generates temporary passwords encrypted in Pulumi state and forces a password reset on first login.
+7. **Group Membership**: Attaches the users to their respective Groups (`UserGroupMemberships.ts`), handling resource dependencies automatically.
+8. **Guardrails & Security**: Provisions ancillary components like Cost Budgets (with an optional Lambda-based automated kill-switch) (`AccountBudget.ts`) and a multi-region CloudTrail alerting pipeline (`SecurityAlerting.ts`) for events like Access Key creation.
 
 ---
 
@@ -32,9 +34,11 @@ When making changes, use this guide to find the relevant code:
 
 - **`/components/`**: 
   - **What it is**: Pulumi `ComponentResource` classes that encapsulate and abstract complex AWS infrastructure patterns.
-  - **`DynamicRole.ts`**: Provisions roles and trust policies.
-  - **`DynamicGroup.ts`**: Provisions groups and handles the critical `AssumeRole` mapping so users can switch to roles.
+  - **`DynamicRole.ts`**: Provisions IAM roles and trust policies, or SSO Permission Sets.
+  - **`DynamicGroup.ts`**: Provisions groups and handles the critical `AssumeRole` or SSO Account Assignment mapping so users can switch to roles.
   - **`BaselineUsers.ts`**: Handles user creation and login profiles.
+  - **`UserGroupMemberships.ts`**: Maps users to their designated groups.
+  - **`AccountBudget.ts`**: Provisions Cost Budgets and an optional Lambda kill-switch.
   - **`SecurityAlerting.ts`**: Builds the CloudTrail → CloudWatch Logs → SNS pipeline.
 
 - **`/policy/`**: 
