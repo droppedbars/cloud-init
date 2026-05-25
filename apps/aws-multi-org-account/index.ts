@@ -22,9 +22,7 @@ const ssoProvider = config.ssoRegion
   : undefined;
 
 const ssoAdminInstances =
-  config.identityStrategy === 'IdentityCenter'
-    ? aws.ssoadmin.getInstancesOutput({}, ssoProvider ? { provider: ssoProvider } : undefined)
-    : undefined;
+  aws.ssoadmin.getInstancesOutput({}, ssoProvider ? { provider: ssoProvider } : undefined)
 const ssoInstanceArn = ssoAdminInstances
   ? ssoAdminInstances.apply((i) => {
     if (!i.arns || i.arns.length === 0) {
@@ -294,7 +292,6 @@ for (const roleConfig of config.roles) {
       roleName: roleConfig.name,
       policyRefs: policyRefs,
       permissionsBoundaryRef: boundaryRef,
-      identityStrategy: config.identityStrategy || 'Traditional',
       ssoInstanceArn: ssoInstanceArn,
     },
     ssoProvider ? { provider: ssoProvider } : undefined,
@@ -330,7 +327,6 @@ for (const groupConfig of config.groups) {
           ? [customPolicyMap['MANAGE_ACCESS_KEYS_POLICY'].arn]
           : []),
       ],
-      identityStrategy: config.identityStrategy || 'Traditional',
       ssoInstanceArn: ssoInstanceArn,
       identityStoreId: identityStoreId,
     },
@@ -372,7 +368,6 @@ const users = new BaselineUsers(
     users: config.users,
     allowedRegions: config.allowedRegions,
     preserveOnDestroy: config.preserveOnDestroy,
-    identityStrategy: config.identityStrategy || 'Traditional',
     identityStoreId: identityStoreId,
   },
   ssoProvider ? { provider: ssoProvider } : undefined,
@@ -392,7 +387,6 @@ new UserGroupMemberships(
       },
       {} as Record<string, pulumi.Output<string>>,
     ),
-    identityStrategy: config.identityStrategy || 'Traditional',
     identityStoreId: identityStoreId,
   },
   {

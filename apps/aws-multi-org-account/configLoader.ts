@@ -46,9 +46,7 @@ export interface AlertingConfig {
 }
 
 export interface Config {
-  identityStrategy?: 'Traditional' | 'IdentityCenter';
-  /** The AWS Region where Identity Center is enabled (e.g. 'ca-west-1'). Defaults to the Pulumi provider region. */
-  ssoRegion?: string;
+  ssoRegion: string;
   roles: RoleConfig[];
   groups: GroupConfig[];
   users: UserConfig[];
@@ -75,7 +73,7 @@ export function loadConfig(): Config {
 
   const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   return {
-    identityStrategy: configData.identityStrategy || 'Traditional',
+    ssoRegion: configData.ssoRegion || 'us-east-1',
     roles: configData.roles || [],
     groups: configData.groups || [],
     users: configData.users || [],

@@ -10,7 +10,6 @@ export interface BaselineUsersArgs {
    * pulumi destroy. Defaults to false.
    */
   preserveOnDestroy?: boolean;
-  identityStrategy: 'Traditional' | 'IdentityCenter';
   identityStoreId?: pulumi.Input<string>;
 }
 
@@ -25,56 +24,33 @@ export class BaselineUsers extends pulumi.ComponentResource {
 
     for (const userConfig of args.users) {
       if (userConfig.create) {
-        if (args.identityStrategy === 'IdentityCenter') {
-          if (!args.identityStoreId)
-            throw new Error(
-              'identityStoreId required for IdentityCenter strategy in BaselineUsers',
-            );
-
-          const user = new aws.identitystore.User(
-            `admin-user-${userConfig.name}`,
-            {
-              identityStoreId: args.identityStoreId,
-              userName: userConfig.name,
-              displayName: userConfig.name,
-              name: {
-                givenName: userConfig.name,
-                familyName: 'User',
-              },
-              emails: {
-                value: userConfig.email || `${userConfig.name}@example.com`,
-                primary: true,
-              },
-            },
-            { parent: this, protect },
+        if (!args.identityStoreId)
+          throw new Error(
+            'identityStoreId required for IdentityCenter strategy in BaselineUsers',
           );
 
-          // Note: Identity Store users don't have programmable initial passwords via Pulumi,
-          // they use the AWS portal to set up their credentials via email.
-          this.initialPasswords[userConfig.name] = pulumi.output('Set via SSO Email');
-          this.userIds[userConfig.name] = user.userId;
-        } else {
-          const user = new aws.iam.User(
-            `admin-user-${userConfig.name}`,
-            {
-              name: userConfig.name,
-              forceDestroy: true,
+        const user = new aws.identitystore.User(
+          `admin-user-${userConfig.name}`,
+          {
+            identityStoreId: args.identityStoreId,
+            userName: userConfig.name,
+            displayName: userConfig.name,
+            name: {
+              givenName: userConfig.name,
+              familyName: 'User',
             },
-            { parent: this, protect },
-          );
-
-          const loginProfile = new aws.iam.UserLoginProfile(
-            `admin-login-profile-${userConfig.name}`,
-            {
-              user: user.name,
-              passwordResetRequired: true,
+            emails: {
+              value: userConfig.email || `${userConfig.name}@example.com`,
+              primary: true,
             },
-            { parent: this },
-          );
+          },
+          { parent: this, protect },
+        );
 
-          this.initialPasswords[userConfig.name] = loginProfile.password;
-          this.userIds[userConfig.name] = pulumi.output(user.name);
-        }
+        // Note: Identity Store users don't have programmable initial passwords via Pulumi,
+        // they use the AWS portal to set up their credentials via email.
+        this.initialPasswords[userConfig.name] = pulumi.output('Set via SSO Email');
+        this.userIds[userConfig.name] = user.userId;
       }
     }
 
