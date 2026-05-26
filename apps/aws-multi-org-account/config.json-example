@@ -1,4 +1,19 @@
 {
+  "organizationalUnits": [
+    {
+      "name": "Workloads",
+      "accounts": [
+        {
+          "name": "Production",
+          "email": "prod@example.com"
+        },
+        {
+          "name": "Staging",
+          "email": "staging@example.com"
+        }
+      ]
+    }
+  ],
   "roles": [
     {
       "name": "ACCOUNT_ADMIN_ROLE",
@@ -37,16 +52,26 @@
   "groups": [
     {
       "name": "OWNERS",
-      "roles": [
-        "ACCOUNT_ADMIN_ROLE",
-        "GLOBAL_DEVELOPER_ROLE",
-        "FINANCE_ADMIN_ROLE"
+      "assignments": [
+        {
+          "roles": ["ACCOUNT_ADMIN_ROLE", "GLOBAL_DEVELOPER_ROLE", "FINANCE_ADMIN_ROLE"],
+          "target": "Management"
+        },
+        {
+          "roles": ["ACCOUNT_ADMIN_ROLE", "GLOBAL_DEVELOPER_ROLE", "FINANCE_ADMIN_ROLE"],
+          "target": "Workloads"
+        }
       ],
       "allowAccessKeyManagement": true
     },
     {
       "name": "DEVELOPERS",
-      "roles": ["GLOBAL_DEVELOPER_ROLE"],
+      "assignments": [
+        {
+          "roles": ["GLOBAL_DEVELOPER_ROLE"],
+          "target": "Workloads"
+        }
+      ],
       "allowAccessKeyManagement": true
     }
   ],

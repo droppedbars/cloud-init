@@ -8,6 +8,7 @@ import { DynamicGroup } from './components/DynamicGroup';
 import { AccountBudget } from './components/AccountBudget';
 import { SecurityAlerting } from './components/SecurityAlerting';
 import { PolicyReference } from './components/DynamicRole';
+import { DynamicOrganization } from './components/DynamicOrganization';
 
 type GroupOutput = {
   groupName: pulumi.Output<string>;
@@ -21,27 +22,37 @@ const ssoProvider = config.ssoRegion
   ? new aws.Provider('sso-provider', { region: config.ssoRegion as aws.Region })
   : undefined;
 
-const ssoAdminInstances =
-  aws.ssoadmin.getInstancesOutput({}, ssoProvider ? { provider: ssoProvider } : undefined)
+const ssoAdminInstances = aws.ssoadmin.getInstancesOutput(
+  {},
+  ssoProvider ? { provider: ssoProvider } : undefined,
+);
 const ssoInstanceArn = ssoAdminInstances
   ? ssoAdminInstances.apply((i) => {
-    if (!i.arns || i.arns.length === 0) {
-      throw new Error(
-        "AWS IAM Identity Center is not enabled in this account. Please enable it before using identityStrategy: 'IdentityCenter'.",
-      );
-    }
-    return i.arns[0];
-  })
+      if (!i.arns || i.arns.length === 0) {
+        throw new Error(
+          "AWS IAM Identity Center is not enabled in this account. Please enable it before using identityStrategy: 'IdentityCenter'.",
+        );
+      }
+      return i.arns[0];
+    })
   : undefined;
 
 const identityStoreId = ssoAdminInstances
   ? ssoAdminInstances.apply((i) => {
-    if (!i.identityStoreIds || i.identityStoreIds.length === 0) {
-      throw new Error('No Identity Store found. Please ensure IAM Identity Center is enabled.');
-    }
-    return i.identityStoreIds[0];
-  })
+      if (!i.identityStoreIds || i.identityStoreIds.length === 0) {
+        throw new Error('No Identity Store found. Please ensure IAM Identity Center is enabled.');
+      }
+      return i.identityStoreIds[0];
+    })
   : undefined;
+
+// 0. Provision the AWS Organization and Member Accounts
+const organization =
+  config.organizationalUnits && config.organizationalUnits.length > 0
+    ? new DynamicOrganization('main-organization', {
+        organizationalUnits: config.organizationalUnits,
+      })
+    : undefined;
 
 // Automatically tag every AWS resource with ManagedBy + any user-defined tags from config.json.
 // This must be registered before any resources are instantiated.
@@ -180,7 +191,8 @@ for (const pol of allBoundariesToCreate) {
   try {
     const policyModule = await import(`./policy/${pol}`);
     const getPolicyDoc = policyModule.default;
-    const policyDoc = typeof getPolicyDoc === 'function' ? getPolicyDoc(config.allowedRegions) : getPolicyDoc;
+    const policyDoc =
+      typeof getPolicyDoc === 'function' ? getPolicyDoc(config.allowedRegions) : getPolicyDoc;
 
     const customBoundary = new aws.iam.Policy(
       `shared-boundary-${pol}`,
@@ -214,7 +226,8 @@ for (const role of config.roles) {
 
     const policyModule = await import(`./policy/${pol.name}`);
     const getPolicyDoc = policyModule.default;
-    const policyDoc = typeof getPolicyDoc === 'function' ? getPolicyDoc(pol.allowedActions) : getPolicyDoc;
+    const policyDoc =
+      typeof getPolicyDoc === 'function' ? getPolicyDoc(pol.allowedActions) : getPolicyDoc;
 
     const roleSpecificPolicy = new aws.iam.Policy(`role-specific-policy-${mapKey}`, {
       name: physicalName,
@@ -304,7 +317,15 @@ const groupComponents: DynamicGroup[] = [];
 
 // 2. Provision dynamic groups
 for (const groupConfig of config.groups) {
-  const requestedRoles = groupConfig.roles.reduce(
+  const allRoleNames = new Set<string>();
+  if (groupConfig.roles) {
+    groupConfig.roles.forEach((r) => allRoleNames.add(r));
+  }
+  if (groupConfig.assignments) {
+    groupConfig.assignments.forEach((a) => a.roles.forEach((r) => allRoleNames.add(r)));
+  }
+
+  const requestedRoles = Array.from(allRoleNames).reduce(
     (acc, roleName) => {
       if (roleMap[roleName]) {
         acc[roleName] = roleMap[roleName];
@@ -321,6 +342,9 @@ for (const groupConfig of config.groups) {
     {
       groupName: groupConfig.name,
       roles: requestedRoles,
+      assignments: groupConfig.assignments,
+      accountIds: organization ? organization.accountIds : undefined,
+      ouAccountIds: organization ? organization.ouAccountIds : undefined,
       sharedPolicyArns: [
         selfServiceMfaPolicy.arn,
         ...(groupConfig.allowAccessKeyManagement
@@ -331,7 +355,7 @@ for (const groupConfig of config.groups) {
       identityStoreId: identityStoreId,
     },
     {
-      dependsOn: roleComponents,
+      dependsOn: [...roleComponents, ...(organization ? [organization] : [])],
       provider: ssoProvider,
     },
   );
@@ -412,9 +436,9 @@ if (config.budget) {
 // 7. Provision Security Alerting if configured
 export const securityAlertingTopicArn = config.alerting
   ? new SecurityAlerting('security-alerting', {
-    notifyOnAccessKeyCreation: config.alerting.notifyOnAccessKeyCreation,
-    notifyOnConsoleLogin: config.alerting.notifyOnConsoleLogin,
-    subscriberEmailAddresses: config.alerting.subscriberEmailAddresses,
-    preserveOnDestroy: config.preserveOnDestroy,
-  }).topicArn
+      notifyOnAccessKeyCreation: config.alerting.notifyOnAccessKeyCreation,
+      notifyOnConsoleLogin: config.alerting.notifyOnConsoleLogin,
+      subscriberEmailAddresses: config.alerting.subscriberEmailAddresses,
+      preserveOnDestroy: config.preserveOnDestroy,
+    }).topicArn
   : undefined;

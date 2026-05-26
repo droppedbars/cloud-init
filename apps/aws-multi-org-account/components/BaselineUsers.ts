@@ -25,9 +25,7 @@ export class BaselineUsers extends pulumi.ComponentResource {
     for (const userConfig of args.users) {
       if (userConfig.create) {
         if (!args.identityStoreId)
-          throw new Error(
-            'identityStoreId required for IdentityCenter strategy in BaselineUsers',
-          );
+          throw new Error('identityStoreId required for IdentityCenter strategy in BaselineUsers');
 
         const user = new aws.identitystore.User(
           `admin-user-${userConfig.name}`,

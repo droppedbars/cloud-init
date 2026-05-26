@@ -12,11 +12,27 @@ export interface RoleConfig {
   permissionsBoundary?: string;
 }
 
+export interface GroupAssignmentConfig {
+  roles: string[];
+  target: string; // The name of an Account or an Organizational Unit
+}
+
 export interface GroupConfig {
   name: string;
-  roles: string[];
+  roles?: string[]; // Legacy: assigns to the management account
+  assignments?: GroupAssignmentConfig[];
   /** When true, attaches MANAGE_ACCESS_KEYS_POLICY granting iam:CreateAccessKey and iam:UpdateAccessKey to the group. */
   allowAccessKeyManagement?: boolean;
+}
+
+export interface AccountConfig {
+  name: string;
+  email: string;
+}
+
+export interface OrganizationalUnitConfig {
+  name: string;
+  accounts: AccountConfig[];
 }
 
 export interface UserConfig {
@@ -47,6 +63,7 @@ export interface AlertingConfig {
 
 export interface Config {
   ssoRegion: string;
+  organizationalUnits?: OrganizationalUnitConfig[];
   roles: RoleConfig[];
   groups: GroupConfig[];
   users: UserConfig[];
@@ -74,6 +91,7 @@ export function loadConfig(): Config {
   const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   return {
     ssoRegion: configData.ssoRegion || 'us-east-1',
+    organizationalUnits: configData.organizationalUnits || [],
     roles: configData.roles || [],
     groups: configData.groups || [],
     users: configData.users || [],

@@ -1,5 +1,5 @@
-const baseConfig = require('@cloud-init/eslint-config');
+import baseConfig from '@cloud-init/eslint-config';
 
-module.exports = [
+export default [
   ...baseConfig,
 ];
