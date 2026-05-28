@@ -3,11 +3,7 @@ import * as pulumi from '@pulumi/pulumi';
 import { loadConfig } from './configLoader';
 import { BaselineUsers } from './components/BaselineUsers';
 import { UserGroupMemberships } from './components/UserGroupMemberships';
-import { DynamicRole } from './components/DynamicRole';
 import { DynamicGroup } from './components/DynamicGroup';
-import { AccountBudget } from './components/AccountBudget';
-import { SecurityAlerting } from './components/SecurityAlerting';
-import { PolicyReference } from './components/DynamicRole';
 import { DynamicOrganization } from './components/DynamicOrganization';
 
 type GroupOutput = {
@@ -18,41 +14,71 @@ type GroupOutput = {
 
 const config = loadConfig();
 
+// 0. Preliminary Checks and Organization Discovery
+let existingOrg: aws.organizations.GetOrganizationResult | undefined;
+let existingOus: { id: string; name: string }[] = [];
+let existingAccounts: { id: string; name: string; email: string; status: string }[] = [];
+
+try {
+  existingOrg = await aws.organizations.getOrganization();
+  if (existingOrg && existingOrg.roots && existingOrg.roots.length > 0) {
+    const ous = await aws.organizations.getOrganizationalUnits({
+      parentId: existingOrg.roots[0].id,
+    });
+    existingOus = ous.children;
+    existingAccounts = existingOrg.accounts;
+  }
+} catch (e: unknown) {
+  if (e instanceof Error && e.message.includes('AWSOrganizationsNotInUseException')) {
+    pulumi.log.info('Organization is not yet created. It will be provisioned.');
+  } else {
+    pulumi.log.warn(`Could not fetch existing organization details: ${e}`);
+  }
+}
+
+// Check Identity Center early
 const ssoProvider = config.ssoRegion
   ? new aws.Provider('sso-provider', { region: config.ssoRegion as aws.Region })
   : undefined;
 
-const ssoAdminInstances = aws.ssoadmin.getInstancesOutput(
-  {},
-  ssoProvider ? { provider: ssoProvider } : undefined,
+let ssoAdminInstances: aws.ssoadmin.GetInstancesResult | undefined;
+try {
+  ssoAdminInstances = await aws.ssoadmin.getInstances(
+    {},
+    ssoProvider ? { provider: ssoProvider } : undefined,
+  );
+  if (!ssoAdminInstances || !ssoAdminInstances.arns || ssoAdminInstances.arns.length === 0) {
+    throw new Error('No Identity Center instances found.');
+  }
+} catch (e) {
+  throw new Error(
+    'AWS IAM Identity Center is not enabled in the management account. Please go enable it manually in the AWS Console and then run this deployment again.',
+    { cause: e },
+  );
+}
+
+const ssoInstanceArn = ssoAdminInstances.arns[0];
+const identityStoreId = ssoAdminInstances.identityStoreIds[0];
+
+// Warning for account closure
+pulumi.log.warn(
+  'Warning: AWS accounts being closed or removed will still exist in a suspended state for 90 days before permanent deletion. They cannot be fully destroyed immediately.',
 );
-const ssoInstanceArn = ssoAdminInstances
-  ? ssoAdminInstances.apply((i) => {
-      if (!i.arns || i.arns.length === 0) {
-        throw new Error(
-          "AWS IAM Identity Center is not enabled in this account. Please enable it before using identityStrategy: 'IdentityCenter'.",
-        );
-      }
-      return i.arns[0];
-    })
-  : undefined;
 
-const identityStoreId = ssoAdminInstances
-  ? ssoAdminInstances.apply((i) => {
-      if (!i.identityStoreIds || i.identityStoreIds.length === 0) {
-        throw new Error('No Identity Store found. Please ensure IAM Identity Center is enabled.');
-      }
-      return i.identityStoreIds[0];
-    })
-  : undefined;
-
-// 0. Provision the AWS Organization and Member Accounts
 const organization =
   config.organizationalUnits && config.organizationalUnits.length > 0
     ? new DynamicOrganization('main-organization', {
         organizationalUnits: config.organizationalUnits,
+        existingOrgId: existingOrg?.id,
+        existingRootId: existingOrg?.roots[0].id,
+        existingMasterAccountId: existingOrg?.masterAccountId,
+        existingOus,
+        existingAccounts,
       })
     : undefined;
+
+// We can export managementAccountId if needed later, but removing it to fix lint errors.
+// const managementAccountId = organization?.managementAccountId;
 
 // Automatically tag every AWS resource with ManagedBy + any user-defined tags from config.json.
 // This must be registered before any resources are instantiated.
@@ -101,265 +127,56 @@ pulumi.runtime.registerStackTransformation((args) => {
 });
 
 export const groupOutputs: Record<string, GroupOutput> = {};
+export let initialPasswords: Record<string, pulumi.Output<string>> | undefined = undefined;
 
-// 1. Centrally create shared IAM Policies to prevent EntityAlreadyExists.
-//    Policies with allowedActions are role-specific and get a unique name per role.
-const customPolicyMap: Record<string, { arn: pulumi.Output<string>; isManaged: boolean }> = {};
-const allPoliciesToCreate = new Set<string>();
-const allBoundariesToCreate = new Set<string>();
+// 1. Provision a single AdministratorAccess Permission Set
+const adminPermissionSet = new aws.ssoadmin.PermissionSet(
+  `permission-set-admin`,
+  {
+    name: 'SystemAdministrator',
+    instanceArn: ssoInstanceArn!,
+  },
+  ssoProvider ? { provider: ssoProvider } : undefined,
+);
 
-for (const role of config.roles) {
-  for (const pol of role.policies) {
-    const polName = typeof pol === 'string' ? pol : pol.name;
-    const hasArgs = typeof pol !== 'string' && pol.allowedActions && pol.allowedActions.length > 0;
-
-    if (!polName.startsWith('arn:aws:iam::') && !hasArgs) {
-      // Plain string or object without args — shared, deduplicated
-      allPoliciesToCreate.add(polName);
-    }
-  }
-  if (role.permissionsBoundary && !role.permissionsBoundary.startsWith('arn:aws:iam::')) {
-    allBoundariesToCreate.add(role.permissionsBoundary);
-  }
-}
-
-for (const group of config.groups) {
-  // Opt-in access-key management: register shared policy for deduplication
-  if (group.allowAccessKeyManagement) {
-    allPoliciesToCreate.add('MANAGE_ACCESS_KEYS_POLICY');
-  }
-}
-
-const stackName = pulumi.getStack();
-const projectName = pulumi.getProject();
-
-const oldParents = [
-  `urn:pulumi:${stackName}::${projectName}::cloud-init:iam:BaselineUsers::baseline-users-component`,
-  `urn:pulumi:${stackName}::${projectName}::cloud-init:iam:AccountAdminRole::admin-role-component`,
-];
-
-for (const role of config.roles) {
-  oldParents.push(
-    `urn:pulumi:${stackName}::${projectName}::cloud-init:iam:DynamicRole::dynamic-role-${role.name}`,
-  );
-}
-
-const generateAliases = (resourceName: string): pulumi.Alias[] => {
-  const aliases: pulumi.Alias[] = [{ name: resourceName }];
-  for (const parentUrn of oldParents) {
-    aliases.push({ name: resourceName, parent: parentUrn });
-  }
-  return aliases;
-};
-
-// Create shared (deduplicated) policies
-for (const pol of allPoliciesToCreate) {
-  try {
-    const policyModule = await import(`./policy/${pol}`);
-    const getPolicyDoc = policyModule.default;
-    const policyDoc = typeof getPolicyDoc === 'function' ? getPolicyDoc() : getPolicyDoc;
-
-    const customPolicy = new aws.iam.Policy(
-      `shared-policy-${pol}`,
-      { name: pol, policy: policyDoc.json },
-      { aliases: generateAliases(pol) },
-    );
-    customPolicyMap[pol] = { arn: customPolicy.arn, isManaged: false };
-  } catch (error: any) {
-    if (error.code === 'ERR_MODULE_NOT_FOUND') {
-      // If no local file exists, assume it's an AWS managed policy shorthand
-      customPolicyMap[pol] = {
-        arn: pulumi.output(`arn:aws:iam::aws:policy/${pol}`),
-        isManaged: true,
-      };
-    } else {
-      throw error;
-    }
-  }
-}
-
-// Create the self-service MFA policy — attached to every group so users can
-// bootstrap MFA from their direct session before assuming any role.
-const selfServiceMfaModule = await import('./policy/SELF_SERVICE_MFA_POLICY');
-const selfServiceMfaPolicy = new aws.iam.Policy('shared-policy-SELF_SERVICE_MFA_POLICY', {
-  name: 'SELF_SERVICE_MFA_POLICY',
-  policy: selfServiceMfaModule.default().json,
-});
-
-// Create shared boundary policies
-for (const pol of allBoundariesToCreate) {
-  try {
-    const policyModule = await import(`./policy/${pol}`);
-    const getPolicyDoc = policyModule.default;
-    const policyDoc =
-      typeof getPolicyDoc === 'function' ? getPolicyDoc(config.allowedRegions) : getPolicyDoc;
-
-    const customBoundary = new aws.iam.Policy(
-      `shared-boundary-${pol}`,
-      { name: pol, policy: policyDoc.json },
-      { aliases: generateAliases(pol) },
-    );
-    customPolicyMap[pol] = { arn: customBoundary.arn, isManaged: false };
-  } catch (error: any) {
-    if (error.code === 'MODULE_NOT_FOUND') {
-      // If no local file exists, assume it's an AWS managed policy shorthand
-      customPolicyMap[pol] = {
-        arn: pulumi.output(`arn:aws:iam::aws:policy/${pol}`),
-        isManaged: true,
-      };
-    } else {
-      throw error;
-    }
-  }
-}
-
-// Create role-specific parameterized policies (e.g. GLOBAL_DEVELOPER_POLICY with allowedActions)
-for (const role of config.roles) {
-  for (const pol of role.policies) {
-    if (typeof pol === 'string') continue;
-    if (pol.name.startsWith('arn:aws:iam::')) continue;
-    if (!pol.allowedActions || pol.allowedActions.length === 0) continue;
-
-    const physicalName = `${role.name}_${pol.name}`;
-    const mapKey = `${role.name}:${pol.name}`;
-    if (customPolicyMap[mapKey]) continue;
-
-    const policyModule = await import(`./policy/${pol.name}`);
-    const getPolicyDoc = policyModule.default;
-    const policyDoc =
-      typeof getPolicyDoc === 'function' ? getPolicyDoc(pol.allowedActions) : getPolicyDoc;
-
-    const roleSpecificPolicy = new aws.iam.Policy(`role-specific-policy-${mapKey}`, {
-      name: physicalName,
-      policy: policyDoc.json,
-    });
-    customPolicyMap[mapKey] = { arn: roleSpecificPolicy.arn, isManaged: false };
-  }
-}
-
-// 2. Provision dynamic roles
-const roleMap: Record<string, pulumi.Output<string>> = {};
-const roleComponents: DynamicRole[] = [];
-
-for (const roleConfig of config.roles) {
-  const policyRefs: PolicyReference[] = roleConfig.policies.map((p) => {
-    if (typeof p === 'string') {
-      if (p.startsWith('arn:aws:iam::')) {
-        return {
-          arn: p,
-          name: p.split('/').pop()!,
-          isManaged: p.startsWith('arn:aws:iam::aws:policy/'),
-        };
-      }
-      return {
-        arn: customPolicyMap[p].arn,
-        name: p,
-        isManaged: customPolicyMap[p].isManaged,
-      };
-    }
-    // PolicyConfig object
-    if (p.name.startsWith('arn:aws:iam::')) {
-      return {
-        arn: p.name,
-        name: p.name.split('/').pop()!,
-        isManaged: p.name.startsWith('arn:aws:iam::aws:policy/'),
-      };
-    }
-    const roleSpecificKey = `${roleConfig.name}:${p.name}`;
-    if (customPolicyMap[roleSpecificKey]) {
-      return {
-        arn: customPolicyMap[roleSpecificKey].arn,
-        name: `${roleConfig.name}_${p.name}`,
-        isManaged: customPolicyMap[roleSpecificKey].isManaged,
-      };
-    }
-    const mapped = customPolicyMap[p.name];
-    return {
-      arn: mapped.arn,
-      name: p.name,
-      isManaged: mapped.isManaged,
-    };
-  });
-
-  let boundaryRef: PolicyReference | undefined = undefined;
-  if (roleConfig.permissionsBoundary) {
-    if (roleConfig.permissionsBoundary.startsWith('arn:aws:iam::')) {
-      boundaryRef = {
-        arn: roleConfig.permissionsBoundary,
-        name: roleConfig.permissionsBoundary.split('/').pop()!,
-        isManaged: roleConfig.permissionsBoundary.startsWith('arn:aws:iam::aws:policy/'),
-      };
-    } else {
-      const mapped = customPolicyMap[roleConfig.permissionsBoundary];
-      boundaryRef = {
-        arn: mapped.arn,
-        name: roleConfig.permissionsBoundary,
-        isManaged: mapped.isManaged,
-      };
-    }
-  }
-
-  const dynamicRole = new DynamicRole(
-    `dynamic-role-${roleConfig.name}`,
-    {
-      roleName: roleConfig.name,
-      policyRefs: policyRefs,
-      permissionsBoundaryRef: boundaryRef,
-      ssoInstanceArn: ssoInstanceArn,
-    },
-    ssoProvider ? { provider: ssoProvider } : undefined,
-  );
-  roleComponents.push(dynamicRole);
-  roleMap[roleConfig.name] = dynamicRole.roleArn;
-}
+const adminPolicyAttachment = new aws.ssoadmin.ManagedPolicyAttachment(
+  `admin-managed-policy-attachment`,
+  {
+    instanceArn: ssoInstanceArn!,
+    permissionSetArn: adminPermissionSet.arn,
+    managedPolicyArn: 'arn:aws:iam::aws:policy/AdministratorAccess',
+  },
+  ssoProvider ? { provider: ssoProvider } : undefined,
+);
 
 const groupComponents: DynamicGroup[] = [];
 
 // 2. Provision dynamic groups
+let previousGroup: DynamicGroup | undefined = undefined;
 for (const groupConfig of config.groups) {
-  const allRoleNames = new Set<string>();
-  if (groupConfig.roles) {
-    groupConfig.roles.forEach((r) => allRoleNames.add(r));
-  }
-  if (groupConfig.assignments) {
-    groupConfig.assignments.forEach((a) => a.roles.forEach((r) => allRoleNames.add(r)));
-  }
-
-  const requestedRoles = Array.from(allRoleNames).reduce(
-    (acc, roleName) => {
-      if (roleMap[roleName]) {
-        acc[roleName] = roleMap[roleName];
-      } else {
-        throw new Error(`Group ${groupConfig.name} references undefined role: ${roleName}`);
-      }
-      return acc;
-    },
-    {} as Record<string, pulumi.Output<string>>,
-  );
-
-  const dynamicGroup = new DynamicGroup(
+  const dynamicGroup: DynamicGroup = new DynamicGroup(
     `dynamic-group-${groupConfig.name}`,
     {
       groupName: groupConfig.name,
-      roles: requestedRoles,
+      adminPermissionSetArn: adminPermissionSet.arn,
       assignments: groupConfig.assignments,
       accountIds: organization ? organization.accountIds : undefined,
       ouAccountIds: organization ? organization.ouAccountIds : undefined,
-      sharedPolicyArns: [
-        selfServiceMfaPolicy.arn,
-        ...(groupConfig.allowAccessKeyManagement
-          ? [customPolicyMap['MANAGE_ACCESS_KEYS_POLICY'].arn]
-          : []),
-      ],
       ssoInstanceArn: ssoInstanceArn,
       identityStoreId: identityStoreId,
     },
     {
-      dependsOn: [...roleComponents, ...(organization ? [organization] : [])],
+      dependsOn: [
+        adminPermissionSet,
+        adminPolicyAttachment,
+        ...(organization ? [organization] : []),
+        ...(previousGroup ? [previousGroup] : []),
+      ],
       provider: ssoProvider,
     },
   );
 
+  previousGroup = dynamicGroup;
   groupComponents.push(dynamicGroup);
 
   groupOutputs[groupConfig.name] = {
@@ -369,35 +186,17 @@ for (const groupConfig of config.groups) {
   };
 }
 
-// 3. Enforce a deterministic account password policy.
-//    Without this, AWS applies opaque defaults which can cause misleading
-//    "does not comply with password policy" errors on first-login resets.
-new aws.iam.AccountPasswordPolicy('account-password-policy', {
-  minimumPasswordLength: 12,
-  requireLowercaseCharacters: true,
-  requireUppercaseCharacters: true,
-  requireNumbers: true,
-  requireSymbols: true,
-  allowUsersToChangePassword: true,
-  // Disable forced rotation — MFA is the primary control here.
-  maxPasswordAge: 0,
-  passwordReusePrevention: 24,
-  hardExpiry: false,
-});
-
-// 4. Provision the baseline users
+// 3. Provision the baseline users
 const users = new BaselineUsers(
   'baseline-users-component',
   {
     users: config.users,
-    allowedRegions: config.allowedRegions,
-    preserveOnDestroy: config.preserveOnDestroy,
     identityStoreId: identityStoreId,
   },
   ssoProvider ? { provider: ssoProvider } : undefined,
 );
 
-// 5. Attach users to groups
+// 4. Attach users to groups
 // Wait for users and groups to be created first by defining a dependsOn relationship
 new UserGroupMemberships(
   'user-group-memberships',
@@ -419,26 +218,4 @@ new UserGroupMemberships(
   },
 );
 
-// Export outputs
-export const initialPasswords = users.initialPasswords;
-
-// 6. Provision Account Budget if configured
-if (config.budget) {
-  new AccountBudget('account-init-budget', {
-    limitAmount: config.budget.limitAmount,
-    limitUnit: config.budget.limitUnit,
-    subscriberEmailAddresses: config.budget.subscriberEmailAddresses,
-    allowedRegions: config.allowedRegions,
-    killSwitch: config.budget.killSwitch,
-  });
-}
-
-// 7. Provision Security Alerting if configured
-export const securityAlertingTopicArn = config.alerting
-  ? new SecurityAlerting('security-alerting', {
-      notifyOnAccessKeyCreation: config.alerting.notifyOnAccessKeyCreation,
-      notifyOnConsoleLogin: config.alerting.notifyOnConsoleLogin,
-      subscriberEmailAddresses: config.alerting.subscriberEmailAddresses,
-      preserveOnDestroy: config.preserveOnDestroy,
-    }).topicArn
-  : undefined;
+initialPasswords = users.initialPasswords;

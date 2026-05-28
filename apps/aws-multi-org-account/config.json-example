@@ -1,52 +1,14 @@
 {
+  "ssoRegion": "ca-central-1",
   "organizationalUnits": [
     {
       "name": "Workloads",
       "accounts": [
         {
-          "name": "Production",
-          "email": "prod@example.com"
-        },
-        {
-          "name": "Staging",
-          "email": "staging@example.com"
+          "name": "Foo2",
+          "email": "foo2@example.com"
         }
       ]
-    }
-  ],
-  "roles": [
-    {
-      "name": "ACCOUNT_ADMIN_ROLE",
-      "policies": [
-        "ACCOUNT_ADMIN_POLICY",
-        "BASIC_ALL_USERS_POLICY"
-      ],
-      "permissionsBoundary": "REGION_RESTRICTION_BOUNDARY"
-    },
-    {
-      "name": "GLOBAL_DEVELOPER_ROLE",
-      "policies": [
-        "BASIC_ALL_USERS_POLICY",
-        {
-          "name": "GLOBAL_DEVELOPER_POLICY",
-          "allowedActions": [
-            "ec2:*",
-            "s3:*",
-            "lambda:*",
-            "logs:*",
-            "dynamodb:*"
-          ]
-        }
-      ],
-      "permissionsBoundary": "REGION_RESTRICTION_BOUNDARY"
-    },
-    {
-      "name": "FINANCE_ADMIN_ROLE",
-      "policies": [
-        "FINANCE_ADMIN_POLICY",
-        "BASIC_ALL_USERS_POLICY"
-      ],
-      "permissionsBoundary": "REGION_RESTRICTION_BOUNDARY"
     }
   ],
   "groups": [
@@ -54,61 +16,42 @@
       "name": "OWNERS",
       "assignments": [
         {
-          "roles": ["ACCOUNT_ADMIN_ROLE", "GLOBAL_DEVELOPER_ROLE", "FINANCE_ADMIN_ROLE"],
           "target": "Management"
         },
         {
-          "roles": ["ACCOUNT_ADMIN_ROLE", "GLOBAL_DEVELOPER_ROLE", "FINANCE_ADMIN_ROLE"],
-          "target": "Workloads"
+          "target": "Foo2"
         }
-      ],
-      "allowAccessKeyManagement": true
+      ]
     },
     {
       "name": "DEVELOPERS",
       "assignments": [
         {
-          "roles": ["GLOBAL_DEVELOPER_ROLE"],
-          "target": "Workloads"
+          "target": "Foo2"
         }
-      ],
-      "allowAccessKeyManagement": true
+      ]
     }
   ],
   "users": [
     {
-      "name": "alice",
-      "email": "alice@example.com",
+      "name": "patrick",
+      "email": "patrick@example.com",
       "create": true,
-      "groups": ["OWNERS"]
+      "groups": [
+        "OWNERS"
+      ]
     },
     {
-      "name": "bob",
+      "name": "tony",
+      "email": "tony@example.com",
       "create": true,
-      "groups": ["DEVELOPERS"]
+      "groups": [
+        "DEVELOPERS"
+      ]
     }
   ],
-  "allowedRegions": [
-    "us-east-1",
-    "eu-west-1"
-  ],
-  "budget": {
-    "limitAmount": "100",
-    "limitUnit": "USD",
-    "subscriberEmailAddresses": ["finance@example.com"],
-    "killSwitch": {
-      "thresholdAmount": "150",
-      "subscriberEmailAddresses": ["ops@example.com"]
-    }
-  },
   "tags": {
-    "Environment": "dev",
+    "Environment": "global",
     "Owner": "platform-team"
-  },
-  "alerting": {
-    "notifyOnAccessKeyCreation": true,
-    "notifyOnConsoleLogin": true,
-    "subscriberEmailAddresses": ["security@example.com"]
-  },
-  "preserveOnDestroy": false
+  }
 }

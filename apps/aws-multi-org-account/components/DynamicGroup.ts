@@ -4,12 +4,11 @@ import { GroupAssignmentConfig } from '../configLoader';
 
 export interface DynamicGroupArgs {
   groupName: string;
-  roles: Record<string, pulumi.Output<string>>;
+  adminPermissionSetArn: pulumi.Output<string>;
   assignments?: GroupAssignmentConfig[];
   accountIds?: Record<string, pulumi.Output<string>>;
   ouAccountIds?: Record<string, pulumi.Output<string>[]>;
-  /** Policies attached to the group itself (available in every member's direct session). */
-  sharedPolicyArns?: pulumi.Input<string>[];
+
   ssoInstanceArn?: pulumi.Input<string>;
   identityStoreId?: pulumi.Input<string>;
 }
@@ -36,12 +35,26 @@ export class DynamicGroup extends pulumi.ComponentResource {
       { parent: this },
     );
 
+    // Artificial delay to allow the newly created Group to propagate across AWS Identity Store
+    // and SSO Admin's internal databases. Assigning a group immediately after creation
+    // often causes the AccountAssignment API to lock up in an IN_PROGRESS state.
+    const delayedGroupId = pulumi.output(group.groupId).apply(async (id) => {
+      pulumi.log.info(
+        `Waiting 60 seconds for Group '${args.groupName}' to propagate in Identity Store...`,
+      );
+      // eslint-disable-next-line no-undef
+      await new Promise((resolve) => setTimeout(resolve, 60000));
+      return id;
+    });
+
     if (args.assignments && args.accountIds && args.ouAccountIds) {
+      let previousAssignment: aws.ssoadmin.AccountAssignment | undefined = undefined;
+
       args.assignments.forEach((assignment, assignmentIndex) => {
         const target = assignment.target;
 
         // Determine the list of account IDs this assignment applies to
-        let targetAccountIds: pulumi.Output<string>[] = [];
+        let targetAccountIds: pulumi.Output<string>[];
         if (args.accountIds![target]) {
           targetAccountIds = [args.accountIds![target]];
         } else if (args.ouAccountIds![target]) {
@@ -51,34 +64,34 @@ export class DynamicGroup extends pulumi.ComponentResource {
           targetAccountIds = [pulumi.output(target)];
         }
 
-        assignment.roles.forEach((roleName) => {
-          const roleArn = args.roles[roleName];
-          if (!roleArn) {
-            throw new Error(
-              `Role ${roleName} not found in provided roles mapping for group ${args.groupName}`,
-            );
-          }
+        targetAccountIds.forEach((targetAccountId, targetIndex) => {
+          pulumi
+            .all([targetAccountId, args.adminPermissionSetArn, delayedGroupId])
+            .apply(([acctId, _pArn, gId]) => {
+              pulumi.log.info(
+                `Queueing Account Assignment: Group '${args.groupName}' (${gId}) -> Target Account '${acctId}'`,
+              );
+            });
 
-          targetAccountIds.forEach((targetAccountId, targetIndex) => {
-            new aws.ssoadmin.AccountAssignment(
-              `${args.groupName}_${roleName}_ASSIGNMENT_${assignmentIndex}_${targetIndex}`,
-              {
-                instanceArn: args.ssoInstanceArn!,
-                permissionSetArn: roleArn,
-                principalId: group.groupId,
-                principalType: 'GROUP',
-                targetId: targetAccountId,
-                targetType: 'AWS_ACCOUNT',
-              },
-              { parent: this },
-            );
-          });
+          const currentAssignment = new aws.ssoadmin.AccountAssignment(
+            `${args.groupName}_ADMIN_ASSIGNMENT_${assignmentIndex}_${targetIndex}`,
+            {
+              instanceArn: args.ssoInstanceArn!,
+              permissionSetArn: args.adminPermissionSetArn,
+              principalId: delayedGroupId,
+              principalType: 'GROUP',
+              targetId: targetAccountId,
+              targetType: 'AWS_ACCOUNT',
+            },
+            {
+              parent: this,
+              dependsOn: previousAssignment ? [previousAssignment] : [],
+            },
+          );
+          previousAssignment = currentAssignment;
         });
       });
     }
-
-    // Note: sharedPolicyArns (e.g. self-service MFA) are ignored in IdentityCenter
-    // because the AWS Access Portal natively handles MFA and portal login globally.
 
     this.groupName = group.displayName;
     // identitystore.Group does not have an ARN

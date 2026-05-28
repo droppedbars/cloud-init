@@ -1,36 +1,60 @@
-# AWS Single Account Baseline
+# AWS Multi-Account Organization Baseline
 
-This Pulumi project sets up a baseline environment for a multi-org AWS subscription.
+This Pulumi project establishes a baseline environment for an AWS Organization with multiple member accounts. It automatically discovers your existing AWS Organization (or creates one if it doesn't exist), provisions Organizational Units (OUs), creates member accounts, and configures IAM Identity Center (SSO) for centralized access management.
 
-## Prerequisites & Security
+## Prerequisites & Constraints
 
-**IMPORTANT:** Before applying this baseline, you must manually log into the AWS Management Console as the **Root User** and configure a Multi-Factor Authentication (MFA) device. AWS strictly prohibits the programmatic management of root account credentials or MFA devices via Infrastructure as Code. 
+### 1. Manual Identity Center Enablement
+You **must** manually enable AWS IAM Identity Center in your AWS Management Console before running this Pulumi stack. AWS does not permit provisioning the core Identity Center Instance programmatically via standard Pulumi/Terraform APIs. If Identity Center is not enabled, the Pulumi deployment will intentionally fail early to protect your infrastructure state.
+
+### 2. Identity Center Region Constraints
+When specifying `"ssoRegion"` in your `config.json`, the selected region **MUST be an AWS region that is enabled by default** (e.g., `us-east-1`, `ca-central-1`, `us-west-2`). 
+
+**Do not deploy Identity Center in an "opt-in" region** (like `ca-west-1` / Calgary). Because newly provisioned AWS member accounts do not have opt-in regions enabled by default, Identity Center will be completely unable to manage those new accounts, resulting in hanging `aws.ssoadmin.AccountAssignment` resources and deployment timeouts.
 
 ## Configuration
 
-You can automatically provision IAM users, or attach existing users, to any dynamically assigned group (e.g. `ACCOUNT_ADMIN`) by defining them in the `config.json` file. You can also restrict all created users to specific AWS regions by providing an `allowedRegions` array.
-
-By default, the application looks for a `config.json` file in the root of the project. You can override this behavior and point to a custom configuration file by setting the `BASELINE_CONFIG_PATH` environment variable (e.g., `BASELINE_CONFIG_PATH=./custom-config.json pulumi up`).
-
-### Identity Center
-
-> [!IMPORTANT]
-> To use IAM Identity Center, you **must** manually enable it in your AWS Management Console first. AWS does not permit provisioning the core Identity Center Instance programmatically via standard Pulumi/Terraform APIs. Once enabled manually, you can set `"identityStrategy": "IdentityCenter"` in your config, and Pulumi will automatically map your configured users, groups, and roles to Identity Store Users, Groups, and Permission Sets. If you do not provide this setting, it defaults to `"Traditional"` (standard IAM).
+The infrastructure is defined entirely by the `config.json` file located in the root of the project.
 
 **`config.json` Example:**
 
 ```json
 {
-  "roles": [
+  "ssoRegion": "ca-central-1",
+  "organizationalUnits": [
     {
-      "name": "ACCOUNT_ADMIN_ROLE",
-      "policies": ["ACCOUNT_ADMIN_POLICY"]
+      "name": "Workloads",
+      "accounts": [
+        {
+          "name": "Production",
+          "email": "prod@example.com"
+        },
+        {
+          "name": "Staging",
+          "email": "staging@example.com"
+        }
+      ]
     }
   ],
   "groups": [
     {
-      "name": "ACCOUNT_ADMIN",
-      "roles": ["ACCOUNT_ADMIN_ROLE"]
+      "name": "OWNERS",
+      "assignments": [
+        {
+          "target": "Management"
+        },
+        {
+          "target": "Production"
+        }
+      ]
+    },
+    {
+      "name": "DEVELOPERS",
+      "assignments": [
+        {
+          "target": "Staging"
+        }
+      ]
     }
   ],
   "users": [
@@ -38,63 +62,40 @@ By default, the application looks for a `config.json` file in the root of the pr
       "name": "alice",
       "email": "alice@example.com",
       "create": true,
-      "groups": ["ACCOUNT_ADMIN"]
+      "groups": ["OWNERS"]
     },
     {
       "name": "bob",
-      "create": false,
-      "groups": ["ACCOUNT_ADMIN"]
+      "email": "bob@example.com",
+      "create": true,
+      "groups": ["DEVELOPERS"]
     }
   ],
-  "userPolicies": ["BASIC_ALL_USERS_POLICY"],
-  "userPermissionsBoundary": "REGION_RESTRICTION_BOUNDARY",
-  "allowedRegions": ["us-east-1", "eu-west-1"],
-  "budget": {
-    "limitAmount": "100",
-    "limitUnit": "USD",
-    "subscriberEmailAddresses": ["finance@example.com"]
+  "tags": {
+    "Environment": "prod",
+    "Owner": "platform-team"
   }
 }
 ```
 
-In the `"roles"` array, you define discrete IAM Roles and attach an array of `policies` to them. Pulumi will automatically locate local `.ts` files inside your `policy/` directory to satisfy the list (or it will accept raw AWS Managed ARNs).
+### Auto-Discovery (Adopt-if-Exists)
 
-In the `"groups"` array, you can define User Groups and specify an array of `roles` that members of the group are permitted to assume. Pulumi automatically bridges them by generating a `sts:AssumeRole` trust policy on the group targeting every matched role ARN.
+The project employs a robust "discovery-first" pattern:
+- **Organizations:** If the executing account is already a management account of an AWS Organization, Pulumi will adopt and use it automatically.
+- **OUs and Accounts:** If OUs or Accounts with the requested names already exist within your organization, Pulumi will retrieve their metadata and manage them without attempting to blindly recreate them.
 
-Any user listed with `"create": true` will be dynamically provisioned by Pulumi. Regardless of whether they are created by this baseline or pre-existed in AWS (e.g. `"create": false`), any listed `groups` will automatically be attached to the user.
+### Suspended Accounts & Naming Collisions
 
-If `allowedRegions` is provided, a Permissions Boundary (`REGION_RESTRICTION_BOUNDARY`) is automatically created and attached to every provisioned user, explicitly denying actions outside the specified regions (while exempting global services like IAM and Route53).
+When an AWS account is closed, it remains in a "suspended" state for 90 days. During this period, the account name and email address are locked to prevent collisions. If the Pulumi script attempts to provision an account and detects that an account with that name is currently suspended, it will automatically generate a randomized 4-character suffix (e.g., `Production-f83e` and `prod+f83e@example.com`) to bypass the collision gracefully.
 
-If `budget` is provided, Pulumi automatically provisions an overarching AWS Cost Budget for the account, setting up notifications to the configured email addresses at both 80% (actual) and 100% (forecasted) thresholds.
+### Centralized Root Access
 
-## Accessing User Credentials
+The project automatically enables the `RootCredentialsManagement` and `RootSessions` features within your AWS Organization. This strictly centralizes root user access control to your management account and drastically reduces the security risk of managing long-term root credentials in your member accounts.
 
-*(Note: Users will receive an email from AWS to set up their credentials and login via the AWS Access Portal URL or may need to initiate a password reset.)*
+## Deployment
 
-### ⚠️ Important: MFA Setup & Role Switching
-
-All generated roles enforce a strict **MFA requirement** in their trust policies (`"aws:MultiFactorAuthPresent": "true"`). 
-
-When a user logs in for the first time using only their password, they must navigate to "Security Credentials" to set up their Virtual MFA device. However, **their current console session remains authenticated by password only**. 
-
-If the user attempts to switch roles immediately after configuring MFA, AWS STS will reject the request (often masking it with an opaque `"Invalid information in one or more fields"` error in the console). **Users must explicitly Sign Out and Sign Back In using their newly configured MFA code** before they can successfully switch roles.
-
-## Stack Management & Naming Collisions
-
-**WARNING:** Because this project serves as a foundational baseline for a _single AWS account_, all generated IAM Roles, Groups, and Policies (such as `ACCOUNT_ADMIN_ROLE`) use **explicit, hardcoded physical names** without stack-specific suffixes.
-
-If you attempt to run this script using a different Pulumi stack (e.g., deploying the `prod` stack after already deploying the `dev` stack) within the exact same AWS account, Pulumi will fail with an `EntityAlreadyExists` error. The AWS account can only house one instance of these explicitly named baseline resources.
-
-_Note: Per our architectural rules, the IAM policy definitions explicitly declare specific actions instead of using wildcards (`*`) to adhere to the Principle of Least Privilege._
-
-## Testing
-
-An interactive End-to-End (E2E) testing script is included to quickly validate the infrastructure rules without impacting your real `config.json`.
-
-To run the automated test suite, ensure you have active AWS root/admin credentials in your terminal and run:
+To deploy the infrastructure, authenticate to AWS via the CLI as your management account, ensure your `config.json` is configured properly (with a valid, default-enabled `ssoRegion`), and run:
 
 ```bash
-npm run test:e2e
+pulumi up
 ```
-
-This script will dynamically provision a throwaway Pulumi stack (`e2e-test`), pause to let you manually verify the MFA constraints as an actual user in the console, automatically spin up and terminate an EC2 instance to test the Budget Kill Switch, and cleanly destroy the entire stack when finished. See `TESTING.md` for more details on what is verified.

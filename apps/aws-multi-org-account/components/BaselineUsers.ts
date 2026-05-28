@@ -4,12 +4,6 @@ import { UserConfig } from '../configLoader';
 
 export interface BaselineUsersArgs {
   users: UserConfig[];
-  allowedRegions: string[];
-  /**
-   * When true, sets protect:true on IAM user resources so they survive a
-   * pulumi destroy. Defaults to false.
-   */
-  preserveOnDestroy?: boolean;
   identityStoreId?: pulumi.Input<string>;
 }
 
@@ -19,8 +13,6 @@ export class BaselineUsers extends pulumi.ComponentResource {
 
   constructor(name: string, args: BaselineUsersArgs, opts?: pulumi.ComponentResourceOptions) {
     super('cloud-init:iam:BaselineUsers', name, args, opts);
-
-    const protect = args.preserveOnDestroy ?? false;
 
     for (const userConfig of args.users) {
       if (userConfig.create) {
@@ -42,7 +34,7 @@ export class BaselineUsers extends pulumi.ComponentResource {
               primary: true,
             },
           },
-          { parent: this, protect },
+          { parent: this },
         );
 
         // Note: Identity Store users don't have programmable initial passwords via Pulumi,
