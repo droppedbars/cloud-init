@@ -91,7 +91,7 @@ export class DynamicOrganization extends pulumi.ComponentResource {
             parentId: rootId,
             name: ouConfig.name,
           },
-          { parent: this },
+          { parent: this, retainOnDelete: true },
         );
         ouId = ou.id;
       }
@@ -126,6 +126,7 @@ export class DynamicOrganization extends pulumi.ComponentResource {
               name: name,
               email: email,
               parentId: ouId,
+              closeOnDeletion: true,
               // IAM Identity Center handles access
             },
             { parent: this },

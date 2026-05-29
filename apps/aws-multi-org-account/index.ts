@@ -62,7 +62,7 @@ const identityStoreId = ssoAdminInstances.identityStoreIds[0];
 
 // Warning for account closure
 pulumi.log.warn(
-  'Warning: AWS accounts being closed or removed will still exist in a suspended state for 90 days before permanent deletion. They cannot be fully destroyed immediately.',
+  'Warning: AWS accounts being closed or removed will still exist in a suspended state for 90 days before permanent deletion. Any Organizational Units (OUs) containing these accounts cannot be deleted and their state will be detached. You must manually delete the OUs in the AWS Console after the 90-day account suspension period expires.',
 );
 
 const organization =
