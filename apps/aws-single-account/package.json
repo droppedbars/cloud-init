@@ -1,5 +1,5 @@
 {
-  "name": "aws-single-account-baseline",
+  "name": "aws-single-account",
   "version": "1.0.0",
   "description": "",
   "main": "index.ts",

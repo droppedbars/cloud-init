@@ -1,0 +1,3 @@
+name: aws-multi-org-account
+runtime: bun
+description: Multi AWS account baseline across AWS Organizations with basic security, governance, identity and budget guardrails.

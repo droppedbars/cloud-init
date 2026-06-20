@@ -1,0 +1,37 @@
+{
+  "roles": [
+    {
+      "name": "E2E_TEST_ROLE",
+      "policies": ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+    }
+  ],
+  "groups": [
+    {
+      "name": "E2E_TESTERS",
+      "roles": ["E2E_TEST_ROLE"]
+    }
+  ],
+  "users": [
+    {
+      "name": "e2e-tester",
+      "create": true,
+      "groups": ["E2E_TESTERS"]
+    }
+  ],
+  "allowedRegions": ["us-east-1"],
+  "budget": {
+    "limitAmount": "10",
+    "limitUnit": "USD",
+    "subscriberEmailAddresses": ["test@example.com"],
+    "killSwitch": {
+      "thresholdAmount": "15",
+      "subscriberEmailAddresses": ["test@example.com"]
+    }
+  },
+  "alerting": {
+    "notifyOnAccessKeyCreation": true,
+    "notifyOnConsoleLogin": false,
+    "subscriberEmailAddresses": ["test@example.com"]
+  },
+  "preserveOnDestroy": false
+}

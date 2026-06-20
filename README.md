@@ -24,6 +24,7 @@ If you find a security issue, please report it by emailing [EMAIL_ADDRESS].
 - npm >= 9.0.0
 - Pulumi CLI >= 3.0.0
 - AWS CLI >= 2.0.0
+- bun >= 1.3.0
 
 ### Installation
 

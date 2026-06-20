@@ -1,0 +1,75 @@
+{
+  "ssoRegion": "ca-central-1",
+  "retainOnDelete": false,
+  "organizationalUnits": [
+    {
+      "name": "Workloads",
+      "accounts": [
+        {
+          "name": "Foo2",
+          "email": "foo2@example.com"
+        }
+      ]
+    }
+  ],
+  "permissionSets": [
+    {
+      "name": "AdministratorAccess",
+      "managedPolicies": [
+        "arn:aws:iam::aws:policy/AdministratorAccess"
+      ]
+    },
+    {
+      "name": "ViewOnlyAccess",
+      "managedPolicies": [
+        "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "name": "OWNERS",
+      "assignments": [
+        {
+          "target": "Management",
+          "permissionSet": "AdministratorAccess"
+        },
+        {
+          "target": "Foo2",
+          "permissionSet": "AdministratorAccess"
+        }
+      ]
+    },
+    {
+      "name": "DEVELOPERS",
+      "assignments": [
+        {
+          "target": "Foo2",
+          "permissionSet": "ViewOnlyAccess"
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "name": "patrick",
+      "email": "patrick@example.com",
+      "create": true,
+      "groups": [
+        "OWNERS"
+      ]
+    },
+    {
+      "name": "tony",
+      "email": "tony@example.com",
+      "create": true,
+      "groups": [
+        "DEVELOPERS"
+      ]
+    }
+  ],
+  "tags": {
+    "Environment": "global",
+    "Owner": "platform-team"
+  }
+}

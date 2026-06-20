@@ -47,6 +47,7 @@ This guarantees that linting and formatting rules remain completely uniform acro
   - **Preview**: You run `pulumi preview` to see a detailed diff of exactly what AWS resources Pulumi intends to create, modify, or delete.
   - **Up/Deploy**: Running `pulumi up` executes the instructions and provisions the resources in your AWS account.
 - **Monorepo Integration**: While Pulumi manages the physical deployment and infrastructure state, Turborepo wraps the operational scripts. By defining `"preview"` and `"deploy"` pipelines in `turbo.json`, you have the foundation to run validations or deployments across multiple AWS account baselines in a standardized pipeline.
+- **Dynamic Configuration Patterns**: Our configuration-driven approach allows defining complex mappings between organizations, groups, and IAM permission sets dynamically. Instead of hardcoding permission structures (e.g., standard AdministratorAccess), users centrally define their AWS Identity Center (SSO) `permissionSets` within `config.json`. The Pulumi program dynamically generates and iterates through these sets, provisioning the requisite managed policy attachments and assigning them contextually based on cross-account assignments.
 
 ### AI Agent Configuration
 
