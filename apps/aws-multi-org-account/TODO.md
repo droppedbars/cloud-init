@@ -1,0 +1,5 @@
+- customer managed policies in permissions sets
+- basic MFA, pasword management for new users with restrictions until MFA is configured
+- basic budget alerts, total or per OU
+- region restrictions for users
+- add a flag to keep the OUs and accounts

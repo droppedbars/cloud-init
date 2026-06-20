@@ -1,5 +1,6 @@
 {
   "ssoRegion": "ca-central-1",
+  "retainOnDelete": false,
   "organizationalUnits": [
     {
       "name": "Workloads",
@@ -11,15 +12,31 @@
       ]
     }
   ],
+  "permissionSets": [
+    {
+      "name": "AdministratorAccess",
+      "managedPolicies": [
+        "arn:aws:iam::aws:policy/AdministratorAccess"
+      ]
+    },
+    {
+      "name": "ViewOnlyAccess",
+      "managedPolicies": [
+        "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
+      ]
+    }
+  ],
   "groups": [
     {
       "name": "OWNERS",
       "assignments": [
         {
-          "target": "Management"
+          "target": "Management",
+          "permissionSet": "AdministratorAccess"
         },
         {
-          "target": "Foo2"
+          "target": "Foo2",
+          "permissionSet": "AdministratorAccess"
         }
       ]
     },
@@ -27,7 +44,8 @@
       "name": "DEVELOPERS",
       "assignments": [
         {
-          "target": "Foo2"
+          "target": "Foo2",
+          "permissionSet": "ViewOnlyAccess"
         }
       ]
     }

@@ -36,15 +36,31 @@ The infrastructure is defined entirely by the `config.json` file located in the 
       ]
     }
   ],
+  "permissionSets": [
+    {
+      "name": "AdministratorAccess",
+      "managedPolicies": [
+        "arn:aws:iam::aws:policy/AdministratorAccess"
+      ]
+    },
+    {
+      "name": "ViewOnlyAccess",
+      "managedPolicies": [
+        "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
+      ]
+    }
+  ],
   "groups": [
     {
       "name": "OWNERS",
       "assignments": [
         {
-          "target": "Management"
+          "target": "Management",
+          "permissionSet": "AdministratorAccess"
         },
         {
-          "target": "Production"
+          "target": "Production",
+          "permissionSet": "AdministratorAccess"
         }
       ]
     },
@@ -52,7 +68,8 @@ The infrastructure is defined entirely by the `config.json` file located in the 
       "name": "DEVELOPERS",
       "assignments": [
         {
-          "target": "Staging"
+          "target": "Staging",
+          "permissionSet": "ViewOnlyAccess"
         }
       ]
     }
@@ -87,6 +104,12 @@ The project employs a robust "discovery-first" pattern:
 ### Suspended Accounts & Naming Collisions
 
 When an AWS account is closed, it remains in a "suspended" state for 90 days. During this period, the account name and email address are locked to prevent collisions. If the Pulumi script attempts to provision an account and detects that an account with that name is currently suspended, it will automatically generate a randomized 4-character suffix (e.g., `Production-f83e` and `prod+f83e@example.com`) to bypass the collision gracefully.
+
+Additionally, because AWS accounts cannot be instantaneously permanently deleted, relying on the native Pulumi AWS provider to close accounts often leads to timeout errors as it waits up to 90 days for the `CLOSED` state. 
+
+To solve this, the Pulumi program utilizes `@pulumi/command` to shell out to a small local script (`scripts/closeAccount.ts`) via the AWS SDK during destruction. This cleanly issues the `CloseAccount` API call and successfully drops the account from state without causing the pipeline to fail or timeout.
+
+If you wish to bypass this entirely and simply orphan the accounts and OUs in AWS upon teardown, you can set `"retainOnDelete": true` at the root of your `config.json`. When this flag is enabled, Pulumi will drop the resources from state without attempting deletion or closure.
 
 ### Centralized Root Access
 

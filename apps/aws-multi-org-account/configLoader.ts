@@ -3,6 +3,7 @@ import * as path from 'path';
 
 export interface GroupAssignmentConfig {
   target: string; // The name of an Account or an Organizational Unit
+  permissionSet: string; // The name of the permission set to assign
 }
 
 export interface GroupConfig {
@@ -20,6 +21,11 @@ export interface OrganizationalUnitConfig {
   accounts: AccountConfig[];
 }
 
+export interface PermissionSetConfig {
+  name: string;
+  managedPolicies?: string[];
+}
+
 export interface UserConfig {
   name: string;
   email?: string;
@@ -29,7 +35,9 @@ export interface UserConfig {
 
 export interface Config {
   ssoRegion: string;
+  retainOnDelete?: boolean;
   organizationalUnits?: OrganizationalUnitConfig[];
+  permissionSets?: PermissionSetConfig[];
   groups: GroupConfig[];
   users: UserConfig[];
   tags?: Record<string, string>;
@@ -47,7 +55,9 @@ export function loadConfig(): Config {
   const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   return {
     ssoRegion: configData.ssoRegion || 'us-east-1',
+    retainOnDelete: configData.retainOnDelete ?? false,
     organizationalUnits: configData.organizationalUnits || [],
+    permissionSets: configData.permissionSets || [],
     groups: configData.groups || [],
     users: configData.users || [],
     tags: configData.tags || {},

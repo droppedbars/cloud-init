@@ -17,7 +17,9 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@aws-sdk/client-organizations": "^3.1073.0",
     "@pulumi/aws": "^7.26.0",
+    "@pulumi/command": "^1.2.1",
     "@pulumi/pulumi": "^3.231.0"
   },
   "devDependencies": {

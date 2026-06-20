@@ -69,6 +69,7 @@ const organization =
   config.organizationalUnits && config.organizationalUnits.length > 0
     ? new DynamicOrganization('main-organization', {
         organizationalUnits: config.organizationalUnits,
+        retainOnDelete: config.retainOnDelete,
         existingOrgId: existingOrg?.id,
         existingRootId: existingOrg?.roots[0].id,
         existingMasterAccountId: existingOrg?.masterAccountId,
@@ -129,25 +130,40 @@ pulumi.runtime.registerStackTransformation((args) => {
 export const groupOutputs: Record<string, GroupOutput> = {};
 export let initialPasswords: Record<string, pulumi.Output<string>> | undefined = undefined;
 
-// 1. Provision a single AdministratorAccess Permission Set
-const adminPermissionSet = new aws.ssoadmin.PermissionSet(
-  `permission-set-admin`,
-  {
-    name: 'SystemAdministrator',
-    instanceArn: ssoInstanceArn!,
-  },
-  ssoProvider ? { provider: ssoProvider } : undefined,
-);
+// 1. Provision Permission Sets
+const permissionSetArns: Record<string, pulumi.Output<string>> = {};
+const permissionSetComponents: pulumi.Resource[] = [];
 
-const adminPolicyAttachment = new aws.ssoadmin.ManagedPolicyAttachment(
-  `admin-managed-policy-attachment`,
-  {
-    instanceArn: ssoInstanceArn!,
-    permissionSetArn: adminPermissionSet.arn,
-    managedPolicyArn: 'arn:aws:iam::aws:policy/AdministratorAccess',
-  },
-  ssoProvider ? { provider: ssoProvider } : undefined,
-);
+if (config.permissionSets) {
+  for (const psConfig of config.permissionSets) {
+    const permissionSet = new aws.ssoadmin.PermissionSet(
+      `permission-set-${psConfig.name}`,
+      {
+        name: psConfig.name,
+        instanceArn: ssoInstanceArn!,
+      },
+      ssoProvider ? { provider: ssoProvider } : undefined,
+    );
+
+    permissionSetComponents.push(permissionSet);
+    permissionSetArns[psConfig.name] = permissionSet.arn;
+
+    if (psConfig.managedPolicies) {
+      psConfig.managedPolicies.forEach((policyArn, i) => {
+        const attachment = new aws.ssoadmin.ManagedPolicyAttachment(
+          `managed-policy-attachment-${psConfig.name}-${i}`,
+          {
+            instanceArn: ssoInstanceArn!,
+            permissionSetArn: permissionSet.arn,
+            managedPolicyArn: policyArn,
+          },
+          ssoProvider ? { provider: ssoProvider } : undefined,
+        );
+        permissionSetComponents.push(attachment);
+      });
+    }
+  }
+}
 
 const groupComponents: DynamicGroup[] = [];
 
@@ -158,7 +174,7 @@ for (const groupConfig of config.groups) {
     `dynamic-group-${groupConfig.name}`,
     {
       groupName: groupConfig.name,
-      adminPermissionSetArn: adminPermissionSet.arn,
+      permissionSetArns: permissionSetArns,
       assignments: groupConfig.assignments,
       accountIds: organization ? organization.accountIds : undefined,
       ouAccountIds: organization ? organization.ouAccountIds : undefined,
@@ -167,8 +183,7 @@ for (const groupConfig of config.groups) {
     },
     {
       dependsOn: [
-        adminPermissionSet,
-        adminPolicyAttachment,
+        ...permissionSetComponents,
         ...(organization ? [organization] : []),
         ...(previousGroup ? [previousGroup] : []),
       ],

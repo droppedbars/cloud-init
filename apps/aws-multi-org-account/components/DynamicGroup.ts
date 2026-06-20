@@ -4,7 +4,7 @@ import { GroupAssignmentConfig } from '../configLoader';
 
 export interface DynamicGroupArgs {
   groupName: string;
-  adminPermissionSetArn: pulumi.Output<string>;
+  permissionSetArns: Record<string, pulumi.Output<string>>;
   assignments?: GroupAssignmentConfig[];
   accountIds?: Record<string, pulumi.Output<string>>;
   ouAccountIds?: Record<string, pulumi.Output<string>[]>;
@@ -64,20 +64,27 @@ export class DynamicGroup extends pulumi.ComponentResource {
           targetAccountIds = [pulumi.output(target)];
         }
 
+        const permissionSetArn = args.permissionSetArns[assignment.permissionSet];
+        if (!permissionSetArn) {
+          throw new Error(
+            `Permission set '${assignment.permissionSet}' not found for group '${args.groupName}'`,
+          );
+        }
+
         targetAccountIds.forEach((targetAccountId, targetIndex) => {
           pulumi
-            .all([targetAccountId, args.adminPermissionSetArn, delayedGroupId])
+            .all([targetAccountId, permissionSetArn, delayedGroupId])
             .apply(([acctId, _pArn, gId]) => {
               pulumi.log.info(
-                `Queueing Account Assignment: Group '${args.groupName}' (${gId}) -> Target Account '${acctId}'`,
+                `Queueing Account Assignment: Group '${args.groupName}' (${gId}) -> Target Account '${acctId}' with Permission Set '${assignment.permissionSet}'`,
               );
             });
 
           const currentAssignment = new aws.ssoadmin.AccountAssignment(
-            `${args.groupName}_ADMIN_ASSIGNMENT_${assignmentIndex}_${targetIndex}`,
+            `${args.groupName}_ASSIGNMENT_${assignmentIndex}_${targetIndex}`,
             {
               instanceArn: args.ssoInstanceArn!,
-              permissionSetArn: args.adminPermissionSetArn,
+              permissionSetArn: permissionSetArn,
               principalId: delayedGroupId,
               principalType: 'GROUP',
               targetId: targetAccountId,

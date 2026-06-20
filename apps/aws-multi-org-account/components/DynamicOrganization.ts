@@ -1,9 +1,11 @@
 import * as pulumi from '@pulumi/pulumi';
 import * as aws from '@pulumi/aws';
+import * as command from '@pulumi/command';
 import { OrganizationalUnitConfig } from '../configLoader';
 
 export interface DynamicOrganizationArgs {
   organizationalUnits: OrganizationalUnitConfig[];
+  retainOnDelete?: boolean;
   existingOrgId?: string;
   existingRootId?: string;
   existingMasterAccountId?: string;
@@ -91,7 +93,7 @@ export class DynamicOrganization extends pulumi.ComponentResource {
             parentId: rootId,
             name: ouConfig.name,
           },
-          { parent: this, retainOnDelete: true },
+          { parent: this, retainOnDelete: args.retainOnDelete ?? false },
         );
         ouId = ou.id;
       }
@@ -126,12 +128,29 @@ export class DynamicOrganization extends pulumi.ComponentResource {
               name: name,
               email: email,
               parentId: ouId,
-              closeOnDeletion: true,
               // IAM Identity Center handles access
             },
-            { parent: this },
+            {
+              parent: this,
+              retainOnDelete: true,
+            },
           );
           accountId = account.id;
+
+          // If the user wants to truly delete/close the account instead of retaining it:
+          if (!(args.retainOnDelete ?? false)) {
+            new command.local.Command(
+              `close-account-${name}`,
+              {
+                create: 'echo "Account managed by Pulumi Command"',
+                delete: pulumi.interpolate`bun run scripts/closeAccount.ts ${accountId}`,
+              },
+              {
+                parent: this,
+                dependsOn: [account],
+              },
+            );
+          }
         }
 
         this.accountIds[accountConfig.name] = accountId;
